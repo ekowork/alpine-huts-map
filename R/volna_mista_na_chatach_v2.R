@@ -1,13 +1,29 @@
 library(chromote)
 library(tidyverse)
 library(jsonlite)
+library(readxl)
+library(writexl)
+
 
 # ------------------------------------------------------------
 # Nastavení
 # ------------------------------------------------------------
 
 calendar_results <- tibble()
-n_months_to_scrape <- 2
+
+# Smoke-test defaults: 3 chaty × 1 měsíc.
+# Pro celý běh později nastav MAX_HUTS=0 a N_MONTHS_TO_SCRAPE=2.
+n_months_to_scrape <- as.integer(Sys.getenv("N_MONTHS_TO_SCRAPE", "1"))
+max_huts <- as.integer(Sys.getenv("MAX_HUTS", "3"))
+
+input_huts_path <- Sys.getenv("INPUT_HUTS_XLSX", file.path("data", "chaty.xlsx"))
+calendar_results_path <- Sys.getenv("CALENDAR_RESULTS_XLSX", file.path("data", "calendar_results.xlsx"))
+availability_json_path <- Sys.getenv("AVAILABILITY_JSON", file.path("docs", "availability.json"))
+availability_long_csv_path <- Sys.getenv("AVAILABILITY_LONG_CSV", file.path("data", "availability_long.csv"))
+
+dir.create(dirname(calendar_results_path), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(availability_json_path), recursive = TRUE, showWarnings = FALSE)
+dir.create(dirname(availability_long_csv_path), recursive = TRUE, showWarnings = FALSE)
 
 # huts to check are define below after accessing the website!
 results <- data.frame(
@@ -811,6 +827,10 @@ get_required_env <- function(name) {
 hut_email <- get_required_env("HUT_EMAIL")
 hut_password <- get_required_env("HUT_PASSWORD")
 
+
+# hut_email = "12153688@fsv.cuni.cz"
+# hut_password = "Breakingpassword?:D1"
+
 b <- ChromoteSession$new()
 
 # Lokálně si klidně nech zobrazit browser, v GitHub Actions ne.
@@ -851,10 +871,8 @@ fill_input <- function(b, selector_js, value, timeout = 30) {
   Sys.sleep(0.2)
 }
 
-auto_login <- function(b, email, password, timeout = 40) {
-  b$Page$navigate("https://www.hut-reservation.org/login")
-  Sys.sleep(3)
-
+auto_login <- function(b, email, password, timeout = 40, max_attempts = 3) {
+  
   email_selector <- "
     document.querySelector('input[type=\"email\"]') ||
     document.querySelector('input[name=\"email\"]') ||
@@ -867,50 +885,99 @@ auto_login <- function(b, email, password, timeout = 40) {
         (el.id || '') + ' ' +
         (el.outerHTML || '')
       ).toLowerCase();
-      return meta.includes('mail') || meta.includes('user') || meta.includes('login');
+      return meta.includes('mail') || meta.includes('email') || meta.includes('user') || meta.includes('login');
     })
   "
-
+  
   password_selector <- "
     document.querySelector('input[type=\"password\"]') ||
     document.querySelector('input[name=\"password\"]') ||
     document.querySelector('input[autocomplete=\"current-password\"]') ||
     document.querySelector('input[formcontrolname=\"password\"]')
   "
-
-  fill_input(b, email_selector, email, timeout = timeout)
-  fill_input(b, password_selector, password, timeout = timeout)
-
-  b$Runtime$evaluate("
-    (function() {
-      const buttons = Array.from(document.querySelectorAll('button'));
-      const norm = s => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
-
-      const btn =
-        buttons.find(el => {
-          const txt = norm(el.innerText || el.textContent);
-          return txt.includes('login') ||
-                 txt.includes('log in') ||
-                 txt.includes('anmelden') ||
-                 txt.includes('einloggen') ||
-                 txt.includes('přihlásit');
-        }) ||
-        buttons.find(el => el.type === 'submit') ||
-        document.querySelector('button[type=\"submit\"]');
-
-      if (!btn) throw new Error('Login button not found');
-      btn.click();
-    })()
-  ")
-
-  Sys.sleep(5)
-
-  # Ověříme, že jsme přihlášení tím, že se dostaneme na seznam rezervací
-  go_to_reservation_list(b, timeout = timeout)
-
-  TRUE
+  
+  login_once <- function(attempt) {
+    cat(sprintf("\nLogin pokus %s/%s\n", attempt, max_attempts))
+    
+    cat("Login: otevírám login stránku...\n")
+    b$Page$navigate("https://www.hut-reservation.org/login")
+    Sys.sleep(3)
+    
+    # Některé běhy se tváří načteně, ale Angular/formulář je rozbitý.
+    # Proto při druhém a dalším pokusu uděláme ještě reload.
+    if (attempt > 1) {
+      cat("Login: hard reload stránky...\n")
+      try(b$Page$reload(ignoreCache = TRUE), silent = TRUE)
+      Sys.sleep(4)
+    }
+    
+    cat("Login: vyplňuju email...\n")
+    fill_input(b, email_selector, email, timeout = timeout)
+    Sys.sleep(0.8)
+    
+    cat("Login: klikám NEXT...\n")
+    click_enabled_button_physical(b, "NEXT", timeout = timeout)
+    Sys.sleep(2)
+    
+    cat("Login: čekám na password field...\n")
+    wait_for_js(b, password_selector, timeout = timeout)
+    
+    cat("Login: vyplňuju password...\n")
+    fill_input(b, password_selector, password, timeout = timeout)
+    Sys.sleep(0.8)
+    
+    cat("Login: klikám LOGIN...\n")
+    click_enabled_button_physical(b, "LOGIN", timeout = timeout)
+    Sys.sleep(6)
+    
+    cat("Login: ověřuju přihlášení přes seznam rezervací...\n")
+    
+    # Tohle je důležité: někdy login proběhne, ale appka zůstane divně viset.
+    # Zkusíme reservation list, když selže, reloadneme a zkusíme ještě jednou.
+    ok <- tryCatch({
+      go_to_reservation_list(b, timeout = timeout)
+      TRUE
+    }, error = function(e) {
+      cat("Login: první ověření selhalo, reloaduju a zkouším znovu...\n")
+      cat("Důvod:", conditionMessage(e), "\n")
+      
+      try(b$Page$reload(ignoreCache = TRUE), silent = TRUE)
+      Sys.sleep(5)
+      
+      go_to_reservation_list(b, timeout = timeout)
+      TRUE
+    })
+    
+    ok
+  }
+  
+  last_error <- NULL
+  
+  for (attempt in seq_len(max_attempts)) {
+    ok <- tryCatch({
+      login_once(attempt)
+    }, error = function(e) {
+      last_error <<- e
+      cat(sprintf("Login pokus %s/%s selhal.\n", attempt, max_attempts))
+      cat("Důvod:", conditionMessage(e), "\n")
+      FALSE
+    })
+    
+    if (isTRUE(ok)) {
+      cat("Login OK.\n")
+      return(TRUE)
+    }
+    
+    cat("Login: čistím stav před dalším pokusem...\n")
+    try(b$Page$navigate("about:blank"), silent = TRUE)
+    Sys.sleep(2)
+  }
+  
+  stop(
+    "Login selhal i po ", max_attempts, " pokusech. Poslední chyba: ",
+    if (!is.null(last_error)) conditionMessage(last_error) else "neznámá chyba"
+  )
 }
-
 auto_login(b, hut_email, hut_password)
 
                  
@@ -946,15 +1013,47 @@ auto_login(b, hut_email, hut_password)
  #   fill = "right"
  # )
 
-#chaty %>% write_xlsx("chaty.xlsx")
-library(readxl)
-chaty = read_xlsx("chaty.xlsx")
+#chaty %>% write_xlsx("data/chaty.xlsx")
+if (!file.exists(input_huts_path)) {
+  stop(
+    "Nenacházím vstupní soubor s chatami: ", input_huts_path,
+    "\nDej chaty.xlsx do složky data/ nebo nastav INPUT_HUTS_XLSX."
+  )
+}
 
-huts_to_check <- chaty %>% 
-#  filter(country== "AT") %>%
-  pull(huts) 
+chaty <- readxl::read_xlsx(input_huts_path)
 
-huts_to_check = huts_to_check[1:3]
+if (!"huts" %in% names(chaty)) {
+  stop("Soubor ", input_huts_path, " musí obsahovat sloupec `huts` s názvy typu 'Adamek-Hütte, AT'.")
+}
+
+raw_test_huts <- Sys.getenv("TEST_HUTS", "")
+
+huts_to_check <- if (nzchar(raw_test_huts)) {
+  trimws(strsplit(raw_test_huts, "\\|")[[1]])
+} else {
+  chaty %>%
+    pull(huts) %>%
+    as.character()
+}
+
+huts_to_check <- huts_to_check[nzchar(huts_to_check) & !is.na(huts_to_check)]
+huts_to_check <- unique(huts_to_check)
+
+if (!is.na(max_huts) && max_huts > 0) {
+  huts_to_check <- head(huts_to_check, max_huts)
+}
+
+cat("\n=== SMOKE TEST NASTAVENÍ ===\n")
+cat("Soubor chat:", input_huts_path, "\n")
+cat("Počet chat:", length(huts_to_check), "\n")
+cat("Počet měsíců:", n_months_to_scrape, "\n")
+cat("Vybrané chaty:\n")
+print(huts_to_check)
+
+if (length(huts_to_check) == 0) {
+  stop("Nemám žádné chaty ke kontrole. Zkontroluj data/chaty.xlsx nebo TEST_HUTS.")
+}
 
 # ------------------------------------------------------------
 # Hlavní smyčka
@@ -1081,352 +1180,16 @@ calendar_results_clean <- calendar_results %>%
 
 print(calendar_results_clean)
 
-write_xlsx(calendar_results, "calendar_results.xlsx")
+writexl::write_xlsx(calendar_results, calendar_results_path)
+cat("Zapsáno:", calendar_results_path, "\n")
 
+source(file.path("R", "prepare_availability.R"))
+prepare_availability(
+  in_xlsx = calendar_results_path,
+  out_json = availability_json_path,
+  out_csv = availability_long_csv_path
+)
 
-
-
-####----------------------------------------------------------######
-# ted delam to ze transformuju ty vyscrapovana data do json
-####----------------------------------------------------------######
-
-library(readxl)
-library(jsonlite)
-library(stringr)
-library(stringi)
-library(purrr)
-
-# --- Pomocné funkce ---
-
-slugify_hut_id <- function(raw_hut) {
-  # Odstranění mezer na začátku a konci
-  x <- trimws(raw_hut)
-  
-  # Specifické německé náhrady (jako v Pythonu)
-  replacements <- c("ß" = "ss", "ẞ" = "ss",
-                    "ä" = "a", "ö" = "o", "ü" = "u",
-                    "Ä" = "a", "Ö" = "o", "Ü" = "u")
-  x <- str_replace_all(x, replacements)
-  
-  # Převod na ASCII (odstranění zbylé diakritiky)
-  x <- stri_trans_general(x, "Latin-ASCII")
-  # Na malá písmena
-  x <- tolower(x)
-  # Náhrada ne-alfanumerických znaků pomlčkou
-  x <- str_replace_all(x, "[^a-z0-9]+", "-")
-  # Oříznutí pomlček z krajů
-  x <- str_remove(x, "^-+")
-  x <- str_remove(x, "-+$")
-  return(x)
-}
-
-split_hut_country <- function(raw_hut) {
-  raw_hut <- trimws(raw_hut)
-  # Match struktury: "Jméno, AT"
-  m <- str_match(raw_hut, "^(.*?),\\s*([A-Z]{2})$")
-  
-  if (!is.na(m[1, 1])) {
-    return(list(name = m[1, 2], country = m[1, 3]))
-  } else {
-    return(list(name = raw_hut, country = NA_character_))
-  }
-}
-
-parse_calendar_date <- function(month_header, day) {
-  if (is.na(month_header) || month_header == "" || is.na(day) || day == "") {
-    return(NA_character_)
-  }
-  
-  mh <- trimws(as.character(month_header))
-  m <- str_match(mh, "^(\\d{1,2})/(\\d{4})$")
-  
-  if (is.na(m[1, 1])) {
-    stop(paste("Unexpected month_header:", month_header))
-  }
-  
-  month <- as.integer(m[1, 2])
-  year <- as.integer(m[1, 3])
-  day_val <- as.integer(day)
-  
-  # Sestavení ISO data
-  res_date <- tryCatch({
-    as.Date(paste(year, month, day_val, sep = "-"))
-  }, error = function(e) NA)
-  
-  if (is.na(res_date)) return(NA_character_)
-  return(format(res_date, "%Y-%m-%d"))
-}
-
-normalize_status <- function(raw_status, free_places, disabled) {
-  raw_status <- tolower(trimws(as.character(raw_status)))
-  
-  if (is.na(free_places) || free_places == "") {
-    free_clean <- NA_integer_
-  } else {
-    free_clean <- as.integer(free_places)
-  }
-  
-  if (length(raw_status) > 0 && raw_status == "error") {
-    return(list(status = "error", level = "error", free = free_clean))
-  }
-  
-  # V R může být disabled logická hodnota nebo text. Ošetříme obojí.
-  is_disabled <- !is.na(disabled) && (disabled == TRUE || tolower(as.character(disabled)) == "true")
-  if (is_disabled) {
-    return(list(status = "closed", level = "closed", free = free_clean))
-  }
-  
-  if (length(raw_status) > 0 && raw_status == "unknown" || is.na(free_clean)) {
-    return(list(status = "unknown", level = "unknown", free = NA_integer_))
-  }
-  
-  if (free_clean <= 0) {
-    return(list(status = "full", level = "full", free = 0))
-  }
-  
-  if (free_clean <= 3) {
-    return(list(status = "available", level = "low", free = free_clean))
-  }
-  if (free_clean <= 9) {
-    return(list(status = "available", level = "medium", free = free_clean))
-  }
-  return(list(status = "available", level = "high", free = free_clean))
-}
-
-# --- Hlavní processing logiky ---
-
-build_outputs <- function(df_rows) {
-  generated_at <- format(Sys.time(), "%Y-%m-%dT%H:%M:%S")
-  
-  long_rows <- list()
-  errors_list <- list()
-  huts_list <- list()
-  
-  # Pokud je tabulka prázdná
-  if (nrow(df_rows) == 0) {
-    return(list(long_rows = data.frame(), json = list()))
-  }
-  
-  # Iterace přes řádky (v R převedeme na list pro zachování logiky z Pythonu)
-  for (i in seq_len(nrow(df_rows))) {
-    r <- df_rows[i, ]
-    
-    raw_hut <- r$Hut
-    if (is.na(raw_hut) || trimws(raw_hut) == "") next
-    
-    raw_hut <- trimws(as.character(raw_hut))
-    hut_id <- slugify_hut_id(raw_hut)
-    
-    hut_info <- split_hut_country(raw_hut)
-    hut_name <- hut_info$name
-    country <- hut_info$country
-    
-    raw_status <- if ("status" %in% names(r)) r$status else NA
-    
-    # Scraper error handling
-    if (!is.na(raw_status) && tolower(trimws(as.character(raw_status))) == "error") {
-      err_msg <- if ("error_message" %in% names(r)) r$error_message else NA
-      if (!hut_id %in% names(errors_list)) errors_list[[hut_id]] <- list()
-      
-      errors_list[[hut_id]][[length(errors_list[[hut_id]]) + 1]] <- list(
-        hut = raw_hut,
-        message = if (is.na(err_msg)) NULL else err_msg
-      )
-      next
-    }
-    
-    # Parsování kalendářního dne
-    month_header <- if ("month_header" %in% names(r)) r$month_header else NA
-    day <- if ("day" %in% names(r)) r$day else NA
-    iso_date <- parse_calendar_date(month_header, day)
-    
-    if (is.na(iso_date)) next
-    
-    # Normalizace stavů
-    free_places <- if ("free_places" %in% names(r)) r$free_places else NA
-    disabled <- if ("disabled" %in% names(r)) r$disabled else NA
-    norm <- normalize_status(raw_status, free_places, disabled)
-    
-    # Příprava objektu pro huts JSON
-    if (!hut_id %in% names(huts_list)) {
-      huts_list[[hut_id]] <- list(
-        hut = raw_hut,
-        name = hut_name,
-        country = if (is.na(country)) NULL else country,
-        calendar = list()
-      )
-    }
-    
-    day_obj <- list(
-      free = if (is.na(norm$free)) NULL else norm$free,
-      status = norm$status,
-      level = norm$level
-    )
-    
-    if ("raw_text" %in% names(r) && !is.na(r$raw_text)) day_obj$raw_text <- r$raw_text
-    if ("aria" %in% names(r) && !is.na(r$aria)) day_obj$aria <- r$aria
-    
-    huts_list[[hut_id]]$calendar[[iso_date]] <- day_obj
-    
-    # Příprava řádku pro CSV plochou tabulku
-    long_rows[[length(long_rows) + 1]] <- list(
-      hut_id = hut_id,
-      hut_name = hut_name,
-      country = if (is.na(country)) "" else country,
-      date = iso_date,
-      free_places = if (is.na(norm$free)) NA_integer_ else norm$free,
-      status = norm$status,
-      level = norm$level,
-      raw_hut = raw_hut,
-      raw_status = if (is.na(raw_status)) "" else as.character(raw_status),
-      raw_text = if ("raw_text" %in% names(r) && !is.na(r$raw_text)) as.character(r$raw_text) else "",
-      aria = if ("aria" %in% names(r) && !is.na(r$aria)) as.character(r$aria) else "",
-      disabled = if ("disabled" %in% names(r) && !is.na(r$disabled)) as.character(r$disabled) else "",
-      color = if ("color" %in% names(r) && !is.na(r$color)) as.character(r$color) else ""
-    )
-  }
-  
-  # Převod listu řádků na data.frame
-  if (length(long_rows) > 0) {
-    df_long <- bind_rows(map(long_rows, as.data.frame, stringsAsFactors = FALSE))
-    all_dates <- sort(unique(df_long$date))
-  } else {
-    df_long <- data.frame()
-    all_dates <- c()
-  }
-  
-  # Výpočet agregací / summary pro každou chatu
-  for (hut_id in names(huts_list)) {
-    cal <- huts_list[[hut_id]]$calendar
-    
-    # Filtrace volných dní
-    available_days <- keep(names(cal), function(d) {
-      cal[[d]]$status == "available" && !is.null(cal[[d]]$free) && cal[[d]]$free > 0
-    })
-    available_days <- sort(available_days)
-    
-    days_full <- sum(map_lgl(cal, ~ .x$status == "full"))
-    days_unknown <- sum(map_lgl(cal, ~ .x$status == "unknown"))
-    
-    if (length(available_days) > 0) {
-      next_avail_date <- available_days[1]
-      next_avail_free <- cal[[next_avail_date]]$free
-      all_free_counts <- map_int(available_days, ~ cal[[.x]]$free)
-      max_free <- max(all_free_counts)
-      total_free <- sum(all_free_counts)
-    } else {
-      next_avail_date <- NULL
-      next_avail_free <- NULL
-      max_free <- NULL
-      total_free <- 0
-    }
-    
-    huts_list[[hut_id]]$summary <- list(
-      days_total = length(cal),
-      days_available = length(available_days),
-      days_full = days_full,
-      days_unknown = days_unknown,
-      next_available_date = next_avail_date,
-      next_available_free = next_avail_free,
-      max_free_places = max_free,
-      total_free_place_days = total_free
-    )
-  }
-  
-  # Seřazení chat abecedně podle klíče (hut_id)
-  if (length(huts_list) > 0) {
-    huts_list <- huts_list[order(names(huts_list))]
-  }
-  
-  availability_json <- list(
-    generated_at = generated_at,
-    date_from = if (length(all_dates) > 0) all_dates[1] else NULL,
-    date_to = if (length(all_dates) > 0) all_dates[length(all_dates)] else NULL,
-    errors = errors_list,
-    huts = huts_list
-  )
-  
-  return(list(long_rows = df_long, json = availability_json))
-}
-
-# pomocná funkce pro rychlé spojení listů do data.frame (podobně jako dplyr::bind_rows)
-bind_rows <- function(l) {
-  do.call(rbind, l)
-}
-
-# --- Main Funkce ---
-
-main <- function() {
-  args <- commandArgs(trailingOnly = TRUE)
-  
-  in_xlsx  <- if (length(args) >= 1) args[1] else "calendar_results.xlsx"
-  out_json <- if (length(args) >= 2) args[2] else "availability.json"
-  out_csv  <- if (length(args) >= 3) args[3] else "availability_long.csv"
-  
-  if (!file.exists(in_xlsx)) {
-    stop(paste("Vstupní soubor neexistuje:", in_xlsx))
-  }
-  
-  # Načtení prvního sheetu xlsx
-  df_raw <- read_excel(in_xlsx, sheet = 1)
-  
-  # Spuštění transformace
-  outputs <- build_outputs(df_raw)
-  
-  long_rows <- outputs$long_rows
-  availability_json <- outputs$json
-  
-  # Zápis CSV
-  if (nrow(long_rows) > 0) {
-    write.csv(long_rows, out_csv, row.names = FALSE, na = "", fileEncoding = "UTF-8")
-  } else {
-    # Prázdné CSV s hlavičkou
-    headers <- data.frame(hut_id=c(), hut_name=c(), country=c(), date=c(), free_places=c(), 
-                          status=c(), level=c(), raw_hut=c(), raw_status=c(), raw_text=c(), 
-                          aria=c(), disabled=c(), color=c())
-    write.csv(headers, out_csv, row.names = FALSE)
-  }
-  
-  # Zápis JSON (auto_unbox = TRUE zajistí, že se skalární hodnoty neuloží jako pole [val])
-  writeLines(
-    toJSON(availability_json, auto_unbox = TRUE, pretty = TRUE),
-    out_json,
-    useBytes = TRUE
-  )
-  
-  # Konzoly logy jako v Pythonu
-  num_errors <- sum(map_int(availability_json$errors, length))
-  
-  cat(paste("Input rows:", nrow(df_raw), "\n"))
-  cat(paste("Calendar rows written:", nrow(long_rows), "\n"))
-  cat(paste("Huts:", length(availability_json$huts), "\n"))
-  cat(paste("Date range:", availability_json$date_from, "–", availability_json$date_to, "\n"))
-  cat(paste("Errors:", num_errors, "\n"))
-  cat(paste("Wrote:", out_json, "\n"))
-  cat(paste("Wrote:", out_csv, "\n"))
-}
-
-main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+cat("Zapsáno:", availability_json_path, "\n")
+cat("Zapsáno:", availability_long_csv_path, "\n")
 
