@@ -1,11 +1,702 @@
 <!doctype html>
-<html>
+<html lang="cs">
 <head>
-  <meta charset="utf-8">
-  <title>Alpine huts map</title>
+  <meta charset="utf-8" />
+  <title>Chaty – dostupnost</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <style>
+    html, body, #map { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+
+    .panel {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      z-index: 1000;
+      width: 335px;
+      max-width: calc(100vw - 42px);
+      background: rgba(255, 255, 255, 0.96);
+      padding: 12px;
+      border-radius: 12px;
+      box-shadow: 0 2px 14px rgba(0,0,0,0.20);
+    }
+
+    .panel h1 {
+      font-size: 16px;
+      margin: 0 0 9px 0;
+    }
+
+    .panel label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: #444;
+      margin-bottom: 3px;
+    }
+
+    .panel input {
+      box-sizing: border-box;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid #bbb;
+      font-size: 13px;
+      background: white;
+    }
+
+    .panel input[type="search"] { width: 100%; margin-bottom: 8px; }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr 75px; gap: 7px; margin-bottom: 8px; }
+    .date-row input { width: 100%; }
+
+    .button-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+
+    .panel button {
+      border: 1px solid #bbb;
+      background: #fff;
+      padding: 4px 8px;
+      border-radius: 999px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .panel button.active {
+      border-color: #111;
+      font-weight: 700;
+      background: #f3f3f3;
+    }
+
+    .status-line { font-size: 12px; color: #333; line-height: 1.35; }
+    .warning { margin-top: 8px; font-size: 12px; color: #7a4b00; line-height: 1.35; }
+
+    .mapy-logo {
+      position: absolute;
+      left: 12px;
+      bottom: 28px;
+      z-index: 1000;
+      background: rgba(255,255,255,0.92);
+      padding: 4px 6px;
+      border-radius: 6px;
+      box-shadow: 0 1px 8px rgba(0,0,0,0.14);
+      display: none;
+    }
+    .mapy-logo img { height: 30px; display: block; }
+
+    .popup-wrap { min-width: 360px; max-width: 430px; }
+    .popup-title { font-weight: 800; margin-bottom: 4px; font-size: 16px; }
+    .popup-subtitle { font-size: 12px; color: #555; margin-bottom: 8px; }
+    .popup-section { margin-top: 8px; font-size: 12px; line-height: 1.35; }
+    .popup-section b { font-weight: 750; }
+    .popup-note { background: #fff6dd; border: 1px solid #f0d58a; border-radius: 8px; padding: 6px 7px; margin-top: 8px; font-size: 12px; }
+    .popup-link { margin-top: 8px; }
+
+    .calendar-title {
+      font-weight: 800;
+      font-size: 13px;
+      margin: 12px 0 5px 0;
+      text-transform: capitalize;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 44px);
+      gap: 4px;
+      align-items: center;
+    }
+
+    .calendar-weekday {
+      font-size: 10px;
+      color: #666;
+      text-align: center;
+      font-weight: 700;
+    }
+
+    .calendar-empty {
+      width: 44px;
+      height: 34px;
+    }
+
+    .calendar-day {
+      width: 44px;
+      height: 34px;
+      border-radius: 8px;
+      border: 1px solid #d0d0d0;
+      box-sizing: border-box;
+      background: #f7f7f7;
+      color: #333;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.05;
+    }
+
+    .calendar-day .dom { font-size: 10px; opacity: 0.86; }
+    .calendar-day .free { font-size: 13px; font-weight: 850; }
+
+    .calendar-day.high { background: #1b7837; border-color: #1b7837; color: white; }
+    .calendar-day.medium { background: #86c97a; border-color: #86c97a; color: #10220e; }
+    .calendar-day.low { background: #f9a825; border-color: #f9a825; color: #111; }
+    .calendar-day.full { background: #c62828; border-color: #c62828; color: white; }
+    .calendar-day.closed { background: #424242; border-color: #424242; color: white; }
+    .calendar-day.unknown { background: #e0e0e0; border-color: #bdbdbd; color: #555; }
+    .calendar-day.outside-data { opacity: 0.38; }
+    .calendar-day.selected-range { outline: 2px solid #111; outline-offset: 1px; }
+
+    .calendar-legend {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      font-size: 10px;
+      margin-top: 8px;
+      color: #333;
+    }
+
+    .legend-item { display: inline-flex; align-items: center; gap: 3px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .legend-dot.high { background: #1b7837; }
+    .legend-dot.medium { background: #86c97a; }
+    .legend-dot.low { background: #f9a825; }
+    .legend-dot.full { background: #c62828; }
+    .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
+
+    @media (max-width: 700px) {
+      .panel { width: auto; right: 12px; }
+      .popup-wrap { min-width: 300px; }
+      .calendar-grid { grid-template-columns: repeat(7, 38px); gap: 3px; }
+      .calendar-day, .calendar-empty { width: 38px; height: 32px; }
+    }
+  </style>
 </head>
+
 <body>
-  <h1>Alpine huts availability map</h1>
-  <p>Beta test.</p>
+  <div id="map"></div>
+
+  <div class="panel">
+    <h1>Chaty – dostupnost</h1>
+    <input id="search" type="search" placeholder="Hledat chatu…" />
+
+    <div class="date-row">
+      <div>
+        <label for="dateFrom">Příjezd</label>
+        <input id="dateFrom" type="date" />
+      </div>
+      <div>
+        <label for="dateTo">Odjezd</label>
+        <input id="dateTo" type="date" />
+      </div>
+      <div>
+        <label for="minPlaces">Min. míst</label>
+        <input id="minPlaces" type="number" min="1" step="1" value="1" />
+      </div>
+    </div>
+
+    <div class="button-row" id="quickWindows">
+      <button data-window="7">+7 dní</button>
+      <button data-window="14" class="active">+14 dní</button>
+      <button data-window="30">+30 dní</button>
+      <button data-window="all">vše</button>
+    </div>
+
+    <div class="button-row" id="filters">
+      <button data-status="all" class="active">Vše</button>
+      <button data-status="available">Má volno</button>
+      <button data-status="full">Nemá volno</button>
+      <button data-status="unknown">Neznámé</button>
+      <button data-status="no-data">Bez dat</button>
+    </div>
+
+    <div class="status-line" id="summary">Načítám…</div>
+    <div class="warning" id="warning" style="display:none"></div>
+  </div>
+
+  <a class="mapy-logo" id="mapyLogo" href="https://mapy.com/" target="_blank" rel="noopener">
+    <img src="https://api.mapy.com/img/api/logo.svg" alt="Mapy.com">
+  </a>
+
+  <script src="config.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script>
+    const config = window.HUT_MAP_CONFIG || {};
+    const mapyApiKey = (config.MAPY_API_KEY || "").trim();
+
+    const map = L.map("map", { preferCanvas: true }).setView([47.5, 13.5], 7);
+
+    if (mapyApiKey) {
+      L.tileLayer(
+        `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${encodeURIComponent(mapyApiKey)}`,
+        {
+          minZoom: 0,
+          maxZoom: 19,
+          tileSize: 256,
+          zoomOffset: 0,
+          attribution: '<a href="https://api.mapy.com/copyright" target="_blank" rel="noopener">© Seznam.cz a.s. a další</a>'
+        }
+      ).addTo(map);
+      document.getElementById("mapyLogo").style.display = "block";
+    } else {
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(map);
+      showWarning("Chybí Mapy.com API klíč, proto teď vidíš fallback OpenStreetMap. Klíč vlož do config.js.");
+    }
+
+    const monthNames = [
+      "leden", "únor", "březen", "duben", "květen", "červen",
+      "červenec", "srpen", "září", "říjen", "listopad", "prosinec"
+    ];
+
+    let allFeatures = [];
+    let availabilityData = null;
+    let visibleLayer = L.layerGroup().addTo(map);
+    let activeStatus = "all";
+    let searchTerm = "";
+
+    function showWarning(text) {
+      const warning = document.getElementById("warning");
+      warning.textContent = text;
+      warning.style.display = "block";
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function parseIsoDate(dateString) {
+      const match = String(dateString || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return null;
+      return new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+    }
+
+    function formatIsoDate(date) {
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(date.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
+
+    function addDays(isoDate, days) {
+      const d = parseIsoDate(isoDate);
+      if (!d) return isoDate;
+      d.setUTCDate(d.getUTCDate() + days);
+      return formatIsoDate(d);
+    }
+
+    function minIso(a, b) {
+      if (!a) return b;
+      if (!b) return a;
+      return a <= b ? a : b;
+    }
+
+    function maxIso(a, b) {
+      if (!a) return b;
+      if (!b) return a;
+      return a >= b ? a : b;
+    }
+
+    function formatShortDate(dateString) {
+      const d = parseIsoDate(dateString);
+      if (!d) return escapeHtml(dateString);
+      return `${d.getUTCDate()}. ${d.getUTCMonth() + 1}.`;
+    }
+
+    function slugifyHutId(raw) {
+      return String(raw || "")
+        .trim()
+        .replaceAll("ß", "ss")
+        .replaceAll("ẞ", "ss")
+        .replaceAll("ä", "a").replaceAll("ö", "o").replaceAll("ü", "u")
+        .replaceAll("Ä", "a").replaceAll("Ö", "o").replaceAll("Ü", "u")
+        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+    }
+
+    function getAvailabilityForFeature(feature) {
+      const p = feature.properties || {};
+      const huts = (availabilityData && availabilityData.huts) || {};
+      const candidates = [];
+      if (p.hut_id) candidates.push(String(p.hut_id));
+      if (p.name && p.country) candidates.push(slugifyHutId(`${p.name}, ${p.country}`));
+      if (p.name) candidates.push(slugifyHutId(p.name));
+
+      for (const id of candidates) {
+        if (huts[id]) return { hutId: id, data: huts[id] };
+      }
+      return { hutId: candidates[0] || null, data: null };
+    }
+
+    function levelForFree(free) {
+      if (free == null) return "unknown";
+      if (free <= 0) return "full";
+      if (free <= 3) return "low";
+      if (free <= 9) return "medium";
+      return "high";
+    }
+
+    function getSelectedWindow() {
+      const dataFrom = availabilityData?.date_from || null;
+      const dataTo = availabilityData?.date_to || null;
+      let from = document.getElementById("dateFrom").value || dataFrom;
+      let to = document.getElementById("dateTo").value || dataTo;
+      if (from && to && from > to) [from, to] = [to, from];
+      const minPlaces = Math.max(1, Number(document.getElementById("minPlaces").value || 1));
+      return { from, to, minPlaces };
+    }
+
+    // Poznámka k datům: "Příjezd" (from) je první noc pobytu, "Odjezd" (to) je den,
+    // kdy se chata opouští a NEPOČÍTÁ se jako noc. Tzn. Příjezd 15.6.2026 a Odjezd
+    // 16.6.2026 dohromady znamenají přesně 1 noc, a to noc z 15.6. na 16.6.
+    // Noci pro danou chatu jsou tedy dny s d >= from a d < to (odjezdový den vyloučen).
+    function computeRangeSummary(avail, selected) {
+      if (!avail || !avail.calendar) {
+        return { status: "no-data", level: "unknown", nights: 0, sufficientNights: 0, minFree: null, maxFree: null, knownNights: 0, totalNights: 0 };
+      }
+
+      if (!selected.from || !selected.to || selected.from >= selected.to) {
+        // Není vybraná žádná celá noc (např. příjezd == odjezd).
+        return { status: "no-nights", level: "unknown", nights: 0, sufficientNights: 0, minFree: null, maxFree: null, knownNights: 0, totalNights: 0 };
+      }
+
+      const calendar = avail.calendar;
+      const nights = Object.keys(calendar).filter(d => d >= selected.from && d < selected.to).sort();
+      if (nights.length === 0) {
+        return { status: "unknown", level: "unknown", nights: 0, sufficientNights: 0, minFree: null, maxFree: null, knownNights: 0, totalNights: 0 };
+      }
+
+      let knownNights = 0;
+      let unknownCount = 0;
+      let insufficientCount = 0;
+      let closedCount = 0;
+      let sufficientCount = 0;
+      const freeValues = [];
+
+      for (const iso of nights) {
+        const day = calendar[iso] || {};
+        const status = day.status || "unknown";
+        const free = Number.isInteger(day.free) ? day.free : null;
+
+        if (status === "unknown") {
+          unknownCount += 1;
+          continue;
+        }
+
+        knownNights += 1;
+
+        if (status === "closed") {
+          closedCount += 1;
+          insufficientCount += 1;
+        } else if (status === "available" && free !== null && free >= selected.minPlaces) {
+          sufficientCount += 1;
+          freeValues.push(free);
+        } else {
+          insufficientCount += 1;
+        }
+      }
+
+      const totalNights = nights.length;
+
+      // Aby chata prošla filtrem "Má volno", musí mít dostatek míst KAŽDOU noc
+      // ve vybraném období (ne jen v alespoň jednom dni).
+      if (insufficientCount > 0) {
+        const level = closedCount === totalNights ? "closed" : "full";
+        return { status: level, level, nights: totalNights, sufficientNights: sufficientCount, minFree: null, maxFree: null, knownNights, totalNights };
+      }
+
+      if (unknownCount > 0) {
+        return { status: "unknown", level: "unknown", nights: totalNights, sufficientNights: sufficientCount, minFree: null, maxFree: null, knownNights, totalNights };
+      }
+
+      const minFree = Math.min(...freeValues);
+      const maxFree = Math.max(...freeValues);
+      return {
+        status: "available",
+        level: levelForFree(minFree),
+        nights: totalNights,
+        sufficientNights: sufficientCount,
+        minFree,
+        maxFree,
+        knownNights,
+        totalNights
+      };
+    }
+
+    function markerStyle(summary) {
+      const styles = {
+        high: { fillColor: "#1b7837", radius: 9 },
+        medium: { fillColor: "#86c97a", radius: 9 },
+        low: { fillColor: "#f9a825", radius: 8 },
+        full: { fillColor: "#c62828", radius: 7 },
+        closed: { fillColor: "#424242", radius: 7 },
+        unknown: { fillColor: "#1976d2", radius: 7 },
+        "no-data": { fillColor: "#9e9e9e", radius: 6 }
+      };
+      const s = styles[summary.level] || styles[summary.status] || styles.unknown;
+      return {
+        radius: s.radius,
+        fillColor: s.fillColor,
+        color: "#111",
+        weight: 1,
+        opacity: 1,
+        fillOpacity: 0.9
+      };
+    }
+
+    function featureMatches(feature, summary) {
+      const p = feature.properties || {};
+      const statusOk = activeStatus === "all" || summary.status === activeStatus;
+      const haystack = `${p.name || ""} ${p.country || ""} ${p.hut_id || ""}`.toLowerCase();
+      const searchOk = !searchTerm || haystack.includes(searchTerm);
+      return statusOk && searchOk;
+    }
+
+    function daysInMonth(year, monthIndex) {
+      return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+    }
+
+    function monthKey(date) {
+      return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function statusLabel(day) {
+      if (!day) return "bez dat";
+      if (day.status === "available") return `${day.free} míst`;
+      if (day.status === "full") return "plno";
+      if (day.status === "closed") return "zavřeno";
+      if (day.status === "unknown") return "neznámé";
+      return day.status || "neznámé";
+    }
+
+    function renderMonthCalendar(year, monthIndex, calendar, selected) {
+      const weekdays = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+      const first = new Date(Date.UTC(year, monthIndex, 1));
+      const leadingEmpty = (first.getUTCDay() + 6) % 7;
+      const totalDays = daysInMonth(year, monthIndex);
+
+      let html = `
+        <div class="calendar-title">${monthNames[monthIndex]} ${year}</div>
+        <div class="calendar-grid">
+          ${weekdays.map(day => `<div class="calendar-weekday">${day}</div>`).join("")}
+          ${Array.from({ length: leadingEmpty }).map(() => `<div class="calendar-empty"></div>`).join("")}
+      `;
+
+      for (let day = 1; day <= totalDays; day++) {
+        const iso = formatIsoDate(new Date(Date.UTC(year, monthIndex, day)));
+        const obj = calendar[iso] || null;
+        const free = obj && Number.isInteger(obj.free) ? obj.free : null;
+        const level = obj ? (obj.level || levelForFree(free)) : "unknown";
+        const status = obj ? (obj.status || "unknown") : "unknown";
+        const selectedClass = selected.from && selected.to && iso >= selected.from && iso < selected.to ? " selected-range" : "";
+        const outsideClass = obj ? "" : " outside-data";
+        const freeText = obj
+          ? (status === "closed" ? "×" : status === "unknown" ? "?" : free === null ? "?" : String(free))
+          : "";
+        const title = `${iso}: ${statusLabel(obj)}`;
+        html += `
+          <div class="calendar-day ${escapeHtml(level)}${selectedClass}${outsideClass}" title="${escapeHtml(title)}">
+            <div class="dom">${day}</div>
+            <div class="free">${escapeHtml(freeText)}</div>
+          </div>`;
+      }
+
+      html += `</div>`;
+      return html;
+    }
+
+    function renderCalendar(avail, selected) {
+      const calendar = avail?.calendar || {};
+      const dates = Object.keys(calendar).filter(d => parseIsoDate(d)).sort();
+      if (dates.length === 0) return `<div class="popup-section">Kalendář dostupnosti pro tuto chatu v datech není.</div>`;
+
+      const months = Array.from(new Set(dates.map(date => monthKey(parseIsoDate(date)))));
+      const monthHtml = months.map(key => {
+        const [year, month] = key.split("-").map(Number);
+        return renderMonthCalendar(year, month - 1, calendar, selected);
+      }).join("");
+
+      return `
+        <div class="popup-section">
+          ${monthHtml}
+          <div class="calendar-legend">
+            <span class="legend-item"><span class="legend-dot high"></span>10+ míst</span>
+            <span class="legend-item"><span class="legend-dot medium"></span>4–9</span>
+            <span class="legend-item"><span class="legend-dot low"></span>1–3</span>
+            <span class="legend-item"><span class="legend-dot full"></span>0</span>
+            <span class="legend-item"><span class="legend-dot unknown"></span>?</span>
+          </div>
+        </div>`;
+    }
+
+    function popupHtml(feature, availMatch, summary, selected) {
+      const p = feature.properties || {};
+      const avail = availMatch.data;
+      const name = escapeHtml(p.name || avail?.name || "Chata");
+      const country = escapeHtml(p.country || avail?.country || "");
+      const reservationUrl = p.reservation_url || p.url || "";
+      const notes = p.notes || "";
+      const generatedAt = availabilityData?.generated_at || "";
+      const scrapeSummary = avail?.summary || {};
+      const errors = (availabilityData?.errors && availMatch.hutId && availabilityData.errors[availMatch.hutId]) || [];
+
+      const nightsWord = summary.nights === 1 ? "noc" : (summary.nights >= 2 && summary.nights <= 4 ? "noci" : "nocí");
+      const selectedText = summary.status === "available"
+        ? `<b>Ve vybraném období:</b> chata je volná na celou dobu pobytu (${summary.nights} ${nightsWord}) s min. ${selected.minPlaces} míst/noc. Nejméně volných míst za noc: ${summary.minFree}, nejvíc: ${summary.maxFree}.`
+        : summary.status === "full" || summary.status === "closed"
+          ? `<b>Ve vybraném období:</b> chata NENÍ volná po celou dobu pobytu (${summary.nights} ${nightsWord}) při min. ${selected.minPlaces} míst – alespoň jedna noc nevyhovuje${summary.status === "closed" ? " (zavřeno)" : ""}.`
+          : summary.status === "no-data"
+            ? `<b>Ve vybraném období:</b> pro tuhle chatu nemám napojená data z kalendáře.`
+            : summary.status === "no-nights"
+              ? `<b>Ve vybraném období:</b> vyber prosím odjezd alespoň o den později než příjezd (musí jít o min. 1 noc).`
+              : `<b>Ve vybraném období:</b> výsledek je nejistý – u některé noci chybí data.`;
+
+      const wholeWindowText = avail
+        ? `<b>Celý stažený horizont:</b> ${scrapeSummary.days_available ?? "?"} dnů s volnem, max. ${scrapeSummary.max_free_places ?? "?"} míst, nejbližší volno ${scrapeSummary.next_available_date ? `${formatShortDate(scrapeSummary.next_available_date)} (${scrapeSummary.next_available_free} míst)` : "nenalezeno"}.`
+        : "";
+
+      return `
+        <div class="popup-wrap">
+          <div class="popup-title">${name}</div>
+          <div class="popup-subtitle">${country ? `${country} · ` : ""}ID dostupnosti: ${escapeHtml(availMatch.hutId || "nenalezeno")}</div>
+          <div class="popup-section">${selectedText}</div>
+          ${wholeWindowText ? `<div class="popup-section">${wholeWindowText}</div>` : ""}
+          ${errors.length ? `<div class="popup-note">Pozor: scraper u této chaty zapsal ${errors.length} error řádek/řádků. Denní data ale mohou být částečně použitelná.</div>` : ""}
+          ${renderCalendar(avail, selected)}
+          ${notes ? `<div class="popup-section"><b>Poznámka:</b> ${escapeHtml(notes)}</div>` : ""}
+          ${reservationUrl ? `<div class="popup-link"><a href="${escapeHtml(reservationUrl)}" target="_blank" rel="noopener">Rezervace / detail</a></div>` : ""}
+          <div class="popup-subtitle" style="margin-top:8px">Dostupnost generována: ${escapeHtml(generatedAt || "neznámo")}</div>
+        </div>`;
+    }
+
+    function render() {
+      if (!availabilityData) return;
+      visibleLayer.clearLayers();
+      const selected = getSelectedWindow();
+
+      const enriched = allFeatures.map(feature => {
+        const availMatch = getAvailabilityForFeature(feature);
+        const summary = computeRangeSummary(availMatch.data, selected);
+        return { feature, availMatch, summary };
+      });
+
+      const matching = enriched.filter(item => featureMatches(item.feature, item.summary));
+
+      matching.forEach(item => {
+        const coords = item.feature.geometry && item.feature.geometry.coordinates;
+        if (!coords || coords.length < 2) return;
+        const lon = coords[0];
+        const lat = coords[1];
+        L.circleMarker([lat, lon], markerStyle(item.summary))
+          .bindPopup(popupHtml(item.feature, item.availMatch, item.summary, selected), { maxWidth: 465 })
+          .addTo(visibleLayer);
+      });
+
+      const availableCount = enriched.filter(item => item.summary.status === "available").length;
+      const noDataCount = enriched.filter(item => item.summary.status === "no-data").length;
+      document.getElementById("summary").textContent =
+        `Zobrazeno ${matching.length} z ${allFeatures.length} chat. Volno podle filtru: ${availableCount}. Bez napojených dat: ${noDataCount}.`;
+    }
+
+    function setDefaultControls() {
+      const dataFrom = availabilityData?.date_from;
+      const dataTo = availabilityData?.date_to;
+      // "Odjezd" je den, kdy se pobyt končí, a sám o sobě se za noc nepočítá.
+      // Poslední noc, pro kterou máme data, je dataTo, takže nejzazší možný
+      // odjezd je dataTo + 1 den.
+      const maxDeparture = dataTo ? addDays(dataTo, 1) : "";
+      const dateFromInput = document.getElementById("dateFrom");
+      const dateToInput = document.getElementById("dateTo");
+      dateFromInput.min = dataFrom || "";
+      dateFromInput.max = dataTo || "";
+      dateToInput.min = dataFrom ? addDays(dataFrom, 1) : "";
+      dateToInput.max = maxDeparture;
+      dateFromInput.value = dataFrom || "";
+      dateToInput.value = dataFrom ? minIso(addDays(dataFrom, 14), maxDeparture) : maxDeparture;
+    }
+
+    function setWindow(days) {
+      if (!availabilityData) return;
+      const from = availabilityData.date_from;
+      const dataTo = availabilityData.date_to;
+      const maxDeparture = dataTo ? addDays(dataTo, 1) : "";
+      document.getElementById("dateFrom").value = from || "";
+      if (days === "all") {
+        document.getElementById("dateTo").value = maxDeparture;
+      } else {
+        // "N dní" znamená N nocí: odjezd = příjezd + N.
+        document.getElementById("dateTo").value = from ? minIso(addDays(from, Number(days)), maxDeparture) : "";
+      }
+      render();
+    }
+
+    document.getElementById("quickWindows").addEventListener("click", event => {
+      const button = event.target.closest("button[data-window]");
+      if (!button) return;
+      document.querySelectorAll("#quickWindows button").forEach(btn => btn.classList.remove("active"));
+      button.classList.add("active");
+      setWindow(button.dataset.window);
+    });
+
+    document.getElementById("filters").addEventListener("click", event => {
+      const button = event.target.closest("button[data-status]");
+      if (!button) return;
+      document.querySelectorAll("#filters button").forEach(btn => btn.classList.remove("active"));
+      button.classList.add("active");
+      activeStatus = button.dataset.status;
+      render();
+    });
+
+    document.getElementById("search").addEventListener("input", event => {
+      searchTerm = event.target.value.trim().toLowerCase();
+      render();
+    });
+
+    ["dateFrom", "dateTo", "minPlaces"].forEach(id => {
+      document.getElementById(id).addEventListener("input", render);
+      document.getElementById(id).addEventListener("change", render);
+    });
+
+    Promise.all([
+      fetch("huts.geojson?v=" + Date.now()).then(response => {
+        if (!response.ok) throw new Error(`huts.geojson HTTP ${response.status}`);
+        return response.json();
+      }),
+      fetch("availability.json?v=" + Date.now()).then(response => {
+        if (!response.ok) throw new Error(`availability.json HTTP ${response.status}`);
+        return response.json();
+      })
+    ])
+      .then(([geojson, availability]) => {
+        allFeatures = geojson.features || [];
+        availabilityData = availability;
+        setDefaultControls();
+        render();
+
+        const bounds = [];
+        allFeatures.forEach(feature => {
+          const coords = feature.geometry && feature.geometry.coordinates;
+          if (coords && coords.length >= 2) bounds.push([coords[1], coords[0]]);
+        });
+        if (bounds.length > 0) map.fitBounds(bounds, { padding: [35, 35] });
+      })
+      .catch(error => {
+        document.getElementById("summary").textContent = "Nepovedlo se načíst data mapy";
+        showWarning("Spusť mapu přes lokální server: python -m http.server 8000. Zkontroluj, že vedle index.html leží huts.geojson a availability.json.");
+        console.error(error);
+      });
+  </script>
 </body>
 </html>
