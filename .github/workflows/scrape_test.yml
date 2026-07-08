@@ -1,4 +1,4 @@
-name: Scrape huts availability
+name: Scrape huts availability test
 
 on:
   workflow_dispatch:
