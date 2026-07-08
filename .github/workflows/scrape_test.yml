@@ -29,10 +29,22 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libharfbuzz-dev libfribidi-dev libfontconfig1-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
-      - name: Install R packages
-        run: |
-          Rscript -e 'install.packages(c("chromote", "tidyverse", "jsonlite", "readxl", "writexl"), repos = "https://cloud.r-project.org")'
+     - name: Install R packages
+  run: |
+    Rscript -e 'install.packages(c(
+      "chromote",
+      "jsonlite",
+      "readxl",
+      "writexl",
+      "dplyr",
+      "purrr",
+      "stringr",
+      "tibble",
+      "readr",
+      "lubridate"
+    ), repos = "https://cloud.r-project.org")'
 
+    
       - name: Diagnostics
         run: |
           Rscript -e 'print(Sys.info())'
