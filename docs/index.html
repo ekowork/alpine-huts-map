@@ -198,10 +198,10 @@
     </div>
 
     <div class="button-row" id="quickWindows">
-      <button data-window="7">+7 dní</button>
-      <button data-window="14" class="active">+14 dní</button>
-      <button data-window="30">+30 dní</button>
-      <button data-window="all">vše</button>
+      <button data-weekend="0" class="active">Tento víkend</button>
+      <button data-weekend="1">Příští víkend</button>
+      <button data-weekend="2">Přespříští</button>
+      <button data-window="all">Vše</button>
     </div>
 
     <div class="button-row" id="filters">
@@ -358,17 +358,12 @@
       return { from, to, minPlaces };
     }
 
-    // Poznámka k datům: "Příjezd" (from) je první noc pobytu, "Odjezd" (to) je den,
-    // kdy se chata opouští a NEPOČÍTÁ se jako noc. Tzn. Příjezd 15.6.2026 a Odjezd
-    // 16.6.2026 dohromady znamenají přesně 1 noc, a to noc z 15.6. na 16.6.
-    // Noci pro danou chatu jsou tedy dny s d >= from a d < to (odjezdový den vyloučen).
     function computeRangeSummary(avail, selected) {
       if (!avail || !avail.calendar) {
         return { status: "no-data", level: "unknown", nights: 0, sufficientNights: 0, minFree: null, maxFree: null, knownNights: 0, totalNights: 0 };
       }
 
       if (!selected.from || !selected.to || selected.from >= selected.to) {
-        // Není vybraná žádná celá noc (např. příjezd == odjezd).
         return { status: "no-nights", level: "unknown", nights: 0, sufficientNights: 0, minFree: null, maxFree: null, knownNights: 0, totalNights: 0 };
       }
 
@@ -410,8 +405,6 @@
 
       const totalNights = nights.length;
 
-      // Aby chata prošla filtrem "Má volno", musí mít dostatek míst KAŽDOU noc
-      // ve vybraném období (ne jen v alespoň jednom dni).
       if (insufficientCount > 0) {
         const level = closedCount === totalNights ? "closed" : "full";
         return { status: level, level, nights: totalNights, sufficientNights: sufficientCount, minFree: null, maxFree: null, knownNights, totalNights };
@@ -613,9 +606,6 @@
     function setDefaultControls() {
       const dataFrom = availabilityData?.date_from;
       const dataTo = availabilityData?.date_to;
-      // "Odjezd" je den, kdy se pobyt končí, a sám o sobě se za noc nepočítá.
-      // Poslední noc, pro kterou máme data, je dataTo, takže nejzazší možný
-      // odjezd je dataTo + 1 den.
       const maxDeparture = dataTo ? addDays(dataTo, 1) : "";
       const dateFromInput = document.getElementById("dateFrom");
       const dateToInput = document.getElementById("dateTo");
@@ -623,8 +613,6 @@
       dateFromInput.max = dataTo || "";
       dateToInput.min = dataFrom ? addDays(dataFrom, 1) : "";
       dateToInput.max = maxDeparture;
-      dateFromInput.value = dataFrom || "";
-      dateToInput.value = dataFrom ? minIso(addDays(dataFrom, 14), maxDeparture) : maxDeparture;
     }
 
     function setWindow(days) {
@@ -636,18 +624,48 @@
       if (days === "all") {
         document.getElementById("dateTo").value = maxDeparture;
       } else {
-        // "N dní" znamená N nocí: odjezd = příjezd + N.
         document.getElementById("dateTo").value = from ? minIso(addDays(from, Number(days)), maxDeparture) : "";
       }
       render();
     }
 
+    function setWeekend(offsetWeeks) {
+      if (!availabilityData) return;
+
+      const today = new Date();
+      const base = new Date(Date.UTC(today.getFullYear(), today.getMonth(), today.getDate()));
+
+      const dayOfWeek = base.getUTCDay(); 
+      let daysToFriday = 5 - dayOfWeek;
+      if (dayOfWeek === 6) daysToFriday = -1; 
+      if (dayOfWeek === 0) daysToFriday = -2; 
+
+      daysToFriday += offsetWeeks * 7;
+
+      base.setUTCDate(base.getUTCDate() + daysToFriday);
+      const fridayIso = formatIsoDate(base);
+      const sundayIso = addDays(fridayIso, 2);
+
+      const dataTo = availabilityData.date_to;
+      const maxDeparture = dataTo ? addDays(dataTo, 1) : "";
+
+      document.getElementById("dateFrom").value = fridayIso;
+      document.getElementById("dateTo").value = maxDeparture ? minIso(sundayIso, maxDeparture) : sundayIso;
+
+      render();
+    }
+
     document.getElementById("quickWindows").addEventListener("click", event => {
-      const button = event.target.closest("button[data-window]");
+      const button = event.target.closest("button");
       if (!button) return;
       document.querySelectorAll("#quickWindows button").forEach(btn => btn.classList.remove("active"));
       button.classList.add("active");
-      setWindow(button.dataset.window);
+
+      if (button.dataset.weekend !== undefined) {
+        setWeekend(Number(button.dataset.weekend));
+      } else if (button.dataset.window) {
+        setWindow(button.dataset.window);
+      }
     });
 
     document.getElementById("filters").addEventListener("click", event => {
@@ -683,7 +701,9 @@
         allFeatures = geojson.features || [];
         availabilityData = availability;
         setDefaultControls();
-        render();
+        
+        // Místo vykreslení s prázdnými daty nastavíme na začátek "Tento víkend"
+        setWeekend(0);
 
         const bounds = [];
         allFeatures.forEach(feature => {
