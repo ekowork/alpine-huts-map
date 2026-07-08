@@ -2,74 +2,88 @@ name: Scrape huts availability
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *"
 
 permissions:
   contents: write
 
 concurrency:
-  group: scrape-huts
+  group: hut-scraper
   cancel-in-progress: false
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 360
 
     env:
       HUT_EMAIL: ${{ secrets.HUT_EMAIL }}
       HUT_PASSWORD: ${{ secrets.HUT_PASSWORD }}
+      N_MONTHS_TO_SCRAPE: "2"
       GITHUB_ACTIONS: "true"
-      INPUT_HUTS_XLSX: "data/chaty.xlsx"
-      MAX_HUTS: "3"
-      N_MONTHS_TO_SCRAPE: "1"
-      CALENDAR_RESULTS_XLSX: "data/calendar_results.xlsx"
-      AVAILABILITY_JSON: "docs/availability.json"
-      AVAILABILITY_LONG_CSV: "data/availability_long.csv"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up R
+      - name: Setup R
         uses: r-lib/actions/setup-r@v2
 
-- name: Install R packages
-  run: |
-    Rscript -e 'install.packages(c(
-      "chromote",
-      "jsonlite",
-      "readxl",
-      "writexl",
-      "dplyr",
-      "purrr",
-      "stringr",
-      "tibble",
-      "readr",
-      "lubridate"
-    ), repos = "https://cloud.r-project.org")'
-
-
-    
-      - name: Check Chrome
+      - name: Install system dependencies
         run: |
-          which google-chrome || true
-          which chromium || true
-          which chromium-browser || true
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libharfbuzz-dev libfribidi-dev libfontconfig1-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
 
-      - name: Run scraper and R conversion
+      - name: Cache R packages
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.R_LIBS_USER }}
+          key: ${{ runner.os }}-r-${{ hashFiles('.github/workflows/scrape.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-r-
+
+      - name: Install R packages
+        run: |
+          Rscript -e '
+            pkgs <- c(
+              "chromote", "jsonlite", "readxl", "writexl",
+              "dplyr", "purrr", "stringr", "tibble", "readr", "lubridate"
+            )
+            missing <- setdiff(pkgs, rownames(installed.packages()))
+            if (length(missing)) install.packages(missing, repos = "https://cloud.r-project.org")
+            print(setNames(pkgs %in% rownames(installed.packages()), pkgs))
+          '
+
+      - name: Run scraper
         run: |
           Rscript R/volna_mista_na_chatach_v2.R
+
+      - name: Show outputs
+        if: always()
+        run: |
+          echo "=== data ==="
+          ls -lah data || true
+          echo "=== docs ==="
+          ls -lah docs || true
+          echo "=== availability json preview ==="
+          head -c 1000 docs/availability.json || true
+
+      - name: Upload scraper outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scraper-output
+          retention-days: 14
+          path: |
+            data/calendar_results.xlsx
+            data/availability_long.csv
+            docs/availability.json
 
       - name: Commit updated availability
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-
-          git add data/calendar_results.xlsx data/availability_long.csv docs/availability.json
-
-          if git diff --cached --quiet; then
-            echo "No changes to commit"
-          else
-            git commit -m "Smoke test hut availability"
-            git push
-          fi
+          git add docs/availability.json data/availability_long.csv
+          git commit -m "Update hut availability data" || echo "No changes to commit"
+          git push
