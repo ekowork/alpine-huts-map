@@ -797,57 +797,164 @@ go_to_reservation_list <- function(b, timeout = 40) {
 }
 
 # ------------------------------------------------------------
-# Otevření prohlížeče a ruční login
+# Otevření prohlížeče a automatický login
 # ------------------------------------------------------------
 
+get_required_env <- function(name) {
+  value <- Sys.getenv(name)
+  if (!nzchar(value)) {
+    stop("Missing required environment variable: ", name)
+  }
+  value
+}
+
+hut_email <- get_required_env("HUT_EMAIL")
+hut_password <- get_required_env("HUT_PASSWORD")
+
 b <- ChromoteSession$new()
-b$view()
 
-b$Page$navigate("https://www.hut-reservation.org/login")
+# Lokálně si klidně nech zobrazit browser, v GitHub Actions ne.
+if (Sys.getenv("GITHUB_ACTIONS") != "true") {
+  b$view()
+}
 
-readline(
-  prompt = "Přihlas se. Jakmile uvidíš seznam svých rezervací, zmáčkni ENTER pro pokračování..."
-)
+fill_input <- function(b, selector_js, value, timeout = 30) {
+  wait_for_js(b, selector_js, timeout = timeout)
 
+  b$Runtime$evaluate(sprintf("
+    (function() {
+      const el = %s;
+      if (!el) throw new Error('Input not found');
+
+      el.focus();
+      el.value = '';
+
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+    })()
+  ", selector_js))
+
+  Sys.sleep(0.2)
+  b$Input$insertText(text = value)
+
+  b$Runtime$evaluate(sprintf("
+    (function() {
+      const el = %s;
+      if (!el) throw new Error('Input not found after typing');
+
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.blur();
+    })()
+  ", selector_js))
+
+  Sys.sleep(0.2)
+}
+
+auto_login <- function(b, email, password, timeout = 40) {
+  b$Page$navigate("https://www.hut-reservation.org/login")
+  Sys.sleep(3)
+
+  email_selector <- "
+    document.querySelector('input[type=\"email\"]') ||
+    document.querySelector('input[name=\"email\"]') ||
+    document.querySelector('input[autocomplete=\"username\"]') ||
+    document.querySelector('input[formcontrolname=\"email\"]') ||
+    Array.from(document.querySelectorAll('input')).find(el => {
+      const meta = (
+        (el.placeholder || '') + ' ' +
+        (el.name || '') + ' ' +
+        (el.id || '') + ' ' +
+        (el.outerHTML || '')
+      ).toLowerCase();
+      return meta.includes('mail') || meta.includes('user') || meta.includes('login');
+    })
+  "
+
+  password_selector <- "
+    document.querySelector('input[type=\"password\"]') ||
+    document.querySelector('input[name=\"password\"]') ||
+    document.querySelector('input[autocomplete=\"current-password\"]') ||
+    document.querySelector('input[formcontrolname=\"password\"]')
+  "
+
+  fill_input(b, email_selector, email, timeout = timeout)
+  fill_input(b, password_selector, password, timeout = timeout)
+
+  b$Runtime$evaluate("
+    (function() {
+      const buttons = Array.from(document.querySelectorAll('button'));
+      const norm = s => (s || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+
+      const btn =
+        buttons.find(el => {
+          const txt = norm(el.innerText || el.textContent);
+          return txt.includes('login') ||
+                 txt.includes('log in') ||
+                 txt.includes('anmelden') ||
+                 txt.includes('einloggen') ||
+                 txt.includes('přihlásit');
+        }) ||
+        buttons.find(el => el.type === 'submit') ||
+        document.querySelector('button[type=\"submit\"]');
+
+      if (!btn) throw new Error('Login button not found');
+      btn.click();
+    })()
+  ")
+
+  Sys.sleep(5)
+
+  # Ověříme, že jsme přihlášení tím, že se dostaneme na seznam rezervací
+  go_to_reservation_list(b, timeout = timeout)
+
+  TRUE
+}
+
+auto_login(b, hut_email, hut_password)
+
+                 
 # ------------------------------------------------------------
 # JAKE CHATY JSOU DOSTUPNE K VYHLEDAVANI
 # ------------------------------------------------------------
 
 # Přejdi na stránku s novou rezervací
-go_to_reservation_list(b, timeout = 40)
-click_button_text(b, "NEUE RESERVIERUNG")
+#go_to_reservation_list(b, timeout = 40)
+#click_button_text(b, "NEUE RESERVIERUNG")
 
 # Počkej na input
-wait_for_js(b, "document.querySelector('input[placeholder=\"Hütte auswählen\"]')")
+#wait_for_js(b, "document.querySelector('input[placeholder=\"Hütte auswählen\"]')")
 
 # Vytáhni si seznam!
-dostupne_chaty <- get_all_dropdown_options(b)
+#dostupne_chaty <- get_all_dropdown_options(b)
 
 # Vypiš si je do konzole, ať víš, z čeho vybírat
-print("Seznam chat v menu:")
-print(dostupne_chaty)
+#print("Seznam chat v menu:")
+#print(dostupne_chaty)
 
 
 
 # tedka se podivame jake si vybereme do hledani. napriklad pouze AT
 
-chaty = data.frame(huts = dostupne_chaty) %>%
-  separate(
-    col = huts, 
-    into = c("hut_name", "country"), 
-    sep = ", ", 
-    remove = FALSE, # FALSE znamená, že ti tam zůstane i ten původní spojený sloupec
-    extra = "merge", 
-    fill = "right"
-  )
+#chaty = data.frame(huts = dostupne_chaty) %>%
+ # separate(
+ #   col = huts, 
+ #   into = c("hut_name", "country"), 
+ #   sep = ", ", 
+ #   remove = FALSE, # FALSE znamená, že ti tam zůstane i ten původní spojený sloupec
+ #   extra = "merge", 
+ #   fill = "right"
+ # )
 
-chaty %>% write_xlsx("chaty.xlsx")
+#chaty %>% write_xlsx("chaty.xlsx")
 library(readxl)
 chaty = read_xlsx("chaty.xlsx")
 
 huts_to_check <- chaty %>% 
 #  filter(country== "AT") %>%
   pull(huts) 
+
+huts_to_check = huts_to_check[1:10]
 
 # ------------------------------------------------------------
 # Hlavní smyčka
