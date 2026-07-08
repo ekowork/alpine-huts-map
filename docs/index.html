@@ -166,6 +166,57 @@
     .legend-dot.full { background: #c62828; }
     .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
 
+
+  .intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+
+.intro-box {
+  width: 440px;
+  max-width: calc(100vw - 36px);
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
+  padding: 18px 18px 15px 18px;
+}
+
+.intro-box h2 {
+  margin: 0 0 10px 0;
+  font-size: 19px;
+}
+
+.intro-box p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: #333;
+}
+
+.intro-box .intro-small {
+  font-size: 12px;
+  color: #666;
+}
+
+.intro-box button {
+  margin-top: 8px;
+  width: 100%;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 12px;
+  background: #111;
+  color: white;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+    
     @media (max-width: 700px) {
       .panel { width: auto; right: 12px; }
       .popup-wrap { min-width: 300px; }
@@ -177,6 +228,34 @@
 
 <body>
   <div id="map"></div>
+
+ <div class="intro-overlay" id="introOverlay" style="display:none">
+  <div class="intro-box">
+    <h2>Mountain hut availability map</h2>
+
+    <p>
+      This is a map of mountain huts that can be booked via
+      <b>hut-reservation.org</b>. It shows indicative availability based on the
+      latest automatic data update.
+    </p>
+
+    <p>
+      This is a small private project. The data may be incomplete, contain errors,
+      or become outdated. The official reservation system of each hut is always
+      the source of truth.
+    </p>
+
+    <p class="intro-small">
+      If you find a mistake or something does not work, please let me know or open an issue:
+      <br>
+      <a href="https://github.com/ekowork/alpine-huts-map/issues" target="_blank" rel="noopener">
+        github.com/ekowork/alpine-huts-map/issues
+      </a>
+    </p>
+
+    <button id="introClose">Got it</button>
+  </div>
+</div>
 
   <div class="panel">
     <h1>Chaty – dostupnost</h1>
@@ -224,6 +303,18 @@
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
   <script>
+    const introOverlay = document.getElementById("introOverlay");
+const introClose = document.getElementById("introClose");
+
+if (!localStorage.getItem("hutMapIntroSeen")) {
+  introOverlay.style.display = "flex";
+}
+
+introClose.addEventListener("click", () => {
+  localStorage.setItem("hutMapIntroSeen", "1");
+  introOverlay.style.display = "none";
+});
+        
     const config = window.HUT_MAP_CONFIG || {};
     const mapyApiKey = (config.MAPY_API_KEY || "").trim();
 
