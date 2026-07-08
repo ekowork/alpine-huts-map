@@ -17,8 +17,15 @@ calendar_results <- tibble()
 
 # Smoke-test defaults: 3 chaty × 1 měsíc.
 # Pro celý běh později nastav MAX_HUTS=0 a N_MONTHS_TO_SCRAPE=2.
-n_months_to_scrape <- as.integer(Sys.getenv("N_MONTHS_TO_SCRAPE", "1"))
-max_huts <- as.integer(Sys.getenv("MAX_HUTS", "3"))
+n_months_to_scrape <- as.integer(Sys.getenv("N_MONTHS_TO_SCRAPE", "2"))
+
+max_huts_raw <- Sys.getenv("MAX_HUTS", "")
+
+max_huts <- if (nzchar(max_huts_raw)) {
+  as.integer(max_huts_raw)
+} else {
+  NA_integer_
+}
 
 input_huts_path <- Sys.getenv("INPUT_HUTS_XLSX", file.path("data", "chaty.xlsx"))
 calendar_results_path <- Sys.getenv("CALENDAR_RESULTS_XLSX", file.path("data", "calendar_results.xlsx"))
