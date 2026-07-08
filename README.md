@@ -1,5 +1,8 @@
 # Alpine Hut Availability Map
 
+**Live map:** https://ekowork.github.io/alpine-huts-map/
+**Hut locations:** [open `docs/huts.geojson`](docs/huts.geojson)  
+
 A small private project that shows indicative availability for selected Alpine mountain huts on an interactive map.
 
 The data is scraped from [hut-reservation.org](https://www.hut-reservation.org/) and displayed as a static web map hosted via GitHub Pages.
