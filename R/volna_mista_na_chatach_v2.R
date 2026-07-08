@@ -1182,6 +1182,7 @@ for (hut in huts_to_check) {
 # ------------------------------------------------------------
 
 cat("\n=== HOTOVO ===\n")
+
 calendar_results_clean <- calendar_results %>%
   select(Hut, month_index, month_header, day, free_places, status, raw_text, aria, disabled, color) %>%
   arrange(Hut, month_index, day)
@@ -1192,6 +1193,7 @@ writexl::write_xlsx(calendar_results, calendar_results_path)
 cat("Zapsáno:", calendar_results_path, "\n")
 
 source(file.path("R", "prepare_availability.R"))
+
 prepare_availability(
   in_xlsx = calendar_results_path,
   out_json = availability_json_path,
@@ -1200,4 +1202,32 @@ prepare_availability(
 
 cat("Zapsáno:", availability_json_path, "\n")
 cat("Zapsáno:", availability_long_csv_path, "\n")
+
+
+# ------------------------------------------------------------
+# Denní archiv výsledků
+# ------------------------------------------------------------
+
+history_dir <- file.path("data", "history")
+dir.create(history_dir, recursive = TRUE, showWarnings = FALSE)
+
+run_date <- format(Sys.Date(), "%Y-%m-%d")
+
+history_file <- file.path(
+  history_dir,
+  paste0("availability_", run_date, ".csv.gz")
+)
+
+availability_long_history <- readr::read_csv(
+  availability_long_csv_path,
+  show_col_types = FALSE
+) %>%
+  dplyr::mutate(scraped_at = Sys.time())
+
+readr::write_csv(
+  availability_long_history,
+  history_file
+)
+
+cat("Historický snapshot uložen:", history_file, "\n")
 
