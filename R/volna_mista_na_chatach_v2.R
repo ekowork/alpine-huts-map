@@ -1,9 +1,13 @@
-library(chromote)
-library(tidyverse)
-library(jsonlite)
+library(dplyr)
+library(purrr)
+library(stringr)
+library(tibble)
+library(readr)
 library(readxl)
 library(writexl)
-
+library(jsonlite)
+library(chromote)
+library(lubridate)
 
 # ------------------------------------------------------------
 # Nastavení
