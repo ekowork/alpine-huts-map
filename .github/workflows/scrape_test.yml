@@ -1,0 +1,67 @@
+name: Scrape huts availability
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+
+    env:
+      HUT_EMAIL: ${{ secrets.HUT_EMAIL }}
+      HUT_PASSWORD: ${{ secrets.HUT_PASSWORD }}
+      MAX_HUTS: "3"
+      N_MONTHS_TO_SCRAPE: "1"
+      GITHUB_ACTIONS: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup R
+        uses: r-lib/actions/setup-r@v2
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev libharfbuzz-dev libfribidi-dev libfontconfig1-dev libfreetype6-dev libpng-dev libtiff5-dev libjpeg-dev
+
+      - name: Install R packages
+        run: |
+          Rscript -e 'install.packages(c("chromote", "tidyverse", "jsonlite", "readxl", "writexl"), repos = "https://cloud.r-project.org")'
+
+      - name: Diagnostics
+        run: |
+          Rscript -e 'print(Sys.info())'
+          Rscript -e 'print(R.version.string)'
+          Rscript -e 'print(chromote::find_chrome())'
+          ls -la
+          ls -la data
+          ls -la R
+
+      - name: Run scraper smoke test
+        run: |
+          Rscript R/volna_mista_na_chatach_v2.R
+
+      - name: Show outputs
+        if: always()
+        run: |
+          echo "=== data ==="
+          ls -lah data || true
+          echo "=== docs ==="
+          ls -lah docs || true
+          echo "=== availability json preview ==="
+          head -c 1000 docs/availability.json || true
+
+      - name: Upload smoke test outputs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-output
+          path: |
+            data/calendar_results.xlsx
+            data/availability_long.csv
+            docs/availability.json
