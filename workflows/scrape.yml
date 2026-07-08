@@ -3,8 +3,8 @@ name: Scrape huts availability
 on:
   workflow_dispatch:
   schedule:
-    # Každý druhý den ve 2:17 ráno pražského času
-    - cron: "17 2 */2 * *"
+    # Pondělí/středa/pátek ve 2:17 Praha
+    - cron: "17 2 * * 1,3,5"
       timezone: "Europe/Prague"
 
 permissions:
@@ -19,25 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 355
 
+    env:
+      HUT_EMAIL: ${{ secrets.HUT_EMAIL }}
+      HUT_PASSWORD: ${{ secrets.HUT_PASSWORD }}
+      GITHUB_ACTIONS: "true"
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libcurl4-openssl-dev \
-            libssl-dev \
-            libxml2-dev \
-            libfontconfig1-dev \
-            libharfbuzz-dev \
-            libfribidi-dev \
-            libfreetype6-dev \
-            libpng-dev \
-            libtiff5-dev \
-            libjpeg-dev \
-            chromium-browser
 
       - name: Set up R
         uses: r-lib/actions/setup-r@v2
@@ -46,26 +35,33 @@ jobs:
         uses: r-lib/actions/setup-r-dependencies@v2
         with:
           packages: |
-            any::dplyr
-            any::readr
-            any::jsonlite
-            any::stringr
-            any::lubridate
-            any::purrr
             any::chromote
-            any::rvest
-            any::httr2
+            any::tidyverse
+            any::jsonlite
+            any::readxl
+            any::writexl
+            any::stringi
+
+      - name: Check Chrome
+        run: |
+          which google-chrome || true
+          which chromium || true
+          which chromium-browser || true
 
       - name: Run scraper
         run: |
-          Rscript R/scrape_huts.R
+          Rscript volna_mista_na_chatach_v2.R
+
+      - name: Convert scraper output to map JSON
+        run: |
+          python prepare_availability.py calendar_results.xlsx docs/availability.json docs/availability_long.csv
 
       - name: Commit updated availability
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
-          git add docs/availability.json docs/last_run.json || true
+          git add calendar_results.xlsx docs/availability.json docs/availability_long.csv
 
           if git diff --cached --quiet; then
             echo "No changes to commit"
