@@ -828,9 +828,6 @@ hut_email <- get_required_env("HUT_EMAIL")
 hut_password <- get_required_env("HUT_PASSWORD")
 
 
-# hut_email = "12153688@fsv.cuni.cz"
-# hut_password = "Breakingpassword?:D1"
-
 b <- ChromoteSession$new()
 
 # Lokálně si klidně nech zobrazit browser, v GitHub Actions ne.
