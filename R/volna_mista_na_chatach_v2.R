@@ -954,7 +954,7 @@ huts_to_check <- chaty %>%
 #  filter(country== "AT") %>%
   pull(huts) 
 
-huts_to_check = huts_to_check[1:10]
+huts_to_check = huts_to_check[1:3]
 
 # ------------------------------------------------------------
 # Hlavní smyčka
