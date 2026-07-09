@@ -1237,7 +1237,13 @@ for (hut in huts_to_check) {
   
   calendar_results <- bind_rows(calendar_results, out)
   
-  print(out %>% select(Hut, month_header, day, free_places, status))
+  print(print(
+  out %>%
+    select(Hut, month_index, month_header, day, free_places, status) %>%
+    group_by(month_index, month_header) %>%
+    slice_head(n = 5) %>%
+    ungroup(),
+  n = Inf)
   
   counter <- counter + 1
 }
