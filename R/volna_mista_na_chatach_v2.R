@@ -523,6 +523,69 @@ open_calendar <- function(b, timeout = 20) {
   Sys.sleep(0.5)
 }
 
+wait_for_calendar_counts <- function(b, timeout = 8, interval = 0.5) {
+  start <- Sys.time()
+
+  repeat {
+    out <- b$Runtime$evaluate("
+      JSON.stringify((function() {
+        const norm = s => (s || '').replace(/\\s+/g, ' ').trim();
+
+        const cells = Array.from(document.querySelectorAll('.mat-calendar-body-cell'))
+          .map(el => {
+            const txt = norm(el.innerText || el.textContent);
+            const cls = String(el.className || '');
+            const disabled =
+              el.getAttribute('aria-disabled') === 'true' ||
+              cls.toLowerCase().includes('disabled');
+
+            const nums = txt.match(/\\d+/g) || [];
+
+            return {
+              text: txt,
+              disabled: disabled,
+              n_nums: nums.length
+            };
+          })
+          .filter(x => x.text.length > 0);
+
+        const enabled = cells.filter(x => !x.disabled);
+        const enabled_with_counts = enabled.filter(x => x.n_nums >= 2);
+
+        return {
+          n_cells: cells.length,
+          n_enabled: enabled.length,
+          n_enabled_with_counts: enabled_with_counts.length
+        };
+      })())
+    ")
+
+    state <- jsonlite::fromJSON(out$result$value, simplifyVector = FALSE)
+
+    if (
+      state$n_cells > 0 &&
+      (
+        state$n_enabled == 0 ||
+        state$n_enabled_with_counts > 0
+      )
+    ) {
+      return(TRUE)
+    }
+
+    if (as.numeric(difftime(Sys.time(), start, units = "secs")) > timeout) {
+      cat(
+        "Pozor: availability čísla se nestihla načíst.",
+        "enabled =", state$n_enabled,
+        "with_counts =", state$n_enabled_with_counts,
+        "\n"
+      )
+      return(FALSE)
+    }
+
+    Sys.sleep(interval)
+  }
+}
+
 scrape_visible_calendar_month <- function(b) {
   out <- b$Runtime$evaluate("
     JSON.stringify((function() {
@@ -1096,13 +1159,13 @@ for (hut in huts_to_check) {
     
     with_retries({
       
-      go_to_reservation_list(b, timeout = 40)
+      go_to_reservation_list(b, timeout = 10)
       
-      click_enabled_button_physical(b, "NEUE RESERVIERUNG", timeout = 30)
+      click_enabled_button_physical(b, "NEUE RESERVIERUNG", timeout = 20)
       
-      select_hut_robust(b, hut, timeout = 35)
+      select_hut_robust(b, hut, timeout = 15)
       
-      click_enabled_button_physical(b, "OK", timeout = 30)
+      click_enabled_button_physical(b, "OK", timeout = 10)
       
       wait_for_js(
         b,
@@ -1118,12 +1181,14 @@ for (hut in huts_to_check) {
                txt.includes('zweierzimmer');
       })()
       ",
-        timeout = 50
+        timeout = 12
       )
       
-      Sys.sleep(1.5)
+      Sys.sleep(2)
       
-      open_calendar(b, timeout = 30)
+      open_calendar(b, timeout = 10)
+
+      Sys.sleep(0.5)
       
       hut_months <- list()
       
@@ -1131,6 +1196,8 @@ for (hut in huts_to_check) {
         
         cat("Scrapuji kalendář:", hut, "| měsíc", m, "\n")
         
+        wait_for_calendar_counts(b, timeout = 5)
+
         one_month <- scrape_visible_calendar_month(b) %>%
           mutate(
             Hut = hut,
