@@ -226,6 +226,60 @@
   </style>
 </head>
 
+
+<script>
+  window.APP_BASE_PATH = "/alpine-huts-map"; 
+  
+  window.slugify = function(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  };
+
+  window.analyticsRouteTo = function(path, state = {}) {
+    const fullPath = `${window.APP_BASE_PATH}${path}`;
+
+    if (window.location.pathname !== fullPath) {
+      window.history.pushState(state, "", fullPath);
+    }
+  };
+
+  window.trackHutOpen = function(hut) {
+    const name =
+      hut.hut_name ||
+      hut.name ||
+      hut.properties?.hut_name ||
+      hut.properties?.name;
+
+    const country =
+      hut.country ||
+      hut.properties?.country;
+
+    const id = hut.id || `${name}-${country || ""}`;
+    const slug = window.slugify(id);
+
+    window.analyticsRouteTo(`/h/${slug}`, {
+      view: "hut",
+      hutId: slug
+    });
+  };
+
+  window.trackMapOpen = function() {
+    window.analyticsRouteTo("/", { view: "map" });
+  };
+</script>
+
+
+<!-- Cloudflare Web Analytics -->
+  <script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
+    data-cf-beacon='{"token": "e96be5b4a768454a824345d4cc74e3d2"}'></script>
+  <!-- End Cloudflare Web Analytics -->
+
+  
 <body>
   <div id="map"></div>
 
@@ -682,12 +736,21 @@ introClose.addEventListener("click", () => {
       matching.forEach(item => {
         const coords = item.feature.geometry && item.feature.geometry.coordinates;
         if (!coords || coords.length < 2) return;
+
         const lon = coords[0];
         const lat = coords[1];
-        L.circleMarker([lat, lon], markerStyle(item.summary))
-          .bindPopup(popupHtml(item.feature, item.availMatch, item.summary, selected), { maxWidth: 465 })
-          .addTo(visibleLayer);
-      });
+
+        const marker = L.circleMarker([lat, lon], markerStyle(item.summary))
+            .bindPopup(
+                popupHtml(item.feature, item.availMatch, item.summary, selected),
+            { maxWidth: 465 }
+            )
+        .addTo(visibleLayer);
+
+  marker.on("click", () => {
+    window.trackHutOpen(item.feature);
+  });
+});
 
       const availableCount = enriched.filter(item => item.summary.status === "available").length;
       const noDataCount = enriched.filter(item => item.summary.status === "no-data").length;
