@@ -217,11 +217,122 @@
 }
 
     
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-header h1 { margin: 0; }
+
+    .panel-toggle {
+      display: none;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid #bbb;
+      background: #fff;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .panel .status-line { margin-top: 6px; }
+
+    /* Mobile hut-detail sheet: a real fixed element outside the Leaflet map,
+       so it can never collide with the filter panel and never drifts when
+       the map is panned/zoomed (unlike faking position:fixed on a Leaflet
+       popup, which lives inside a transformed ancestor). */
+    .sheet-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 2500;
+      background: rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
+
+    .bottom-sheet {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 2600;
+      background: white;
+      border-radius: 16px 16px 0 0;
+      box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
+      max-height: 78vh;
+      transform: translateY(100%);
+      transition: transform 0.25s ease;
+      display: none;
+      flex-direction: column;
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+
+    .bottom-sheet.open { transform: translateY(0); display: flex; }
+
+    .bottom-sheet-handle {
+      width: 40px;
+      height: 4px;
+      border-radius: 999px;
+      background: #ddd;
+      margin: 10px auto 2px auto;
+      flex-shrink: 0;
+    }
+
+    .bottom-sheet-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      border: none;
+      background: #f0f0f0;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      font-size: 14px;
+      line-height: 1;
+      cursor: pointer;
+      color: #444;
+    }
+
+    .bottom-sheet-content {
+      overflow-y: auto;
+      padding: 4px 16px 18px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+
     @media (max-width: 700px) {
-      .panel { width: auto; right: 12px; }
+      .panel {
+        width: auto;
+        right: 12px;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+      }
+
+      .panel-toggle { display: inline-flex; }
+      .panel.collapsed .panel-body { display: none; }
+      .panel button { padding: 6px 10px; font-size: 13px; }
+
       .popup-wrap { min-width: 300px; }
       .calendar-grid { grid-template-columns: repeat(7, 38px); gap: 3px; }
       .calendar-day, .calendar-empty { width: 38px; height: 32px; }
+
+      /* Inside the bottom sheet the popup content should use the full
+         available width instead of the desktop min/max-width. */
+      .bottom-sheet .popup-wrap { min-width: 0; max-width: none; }
+    }
+
+    @media (max-width: 380px) {
+      .date-row { grid-template-columns: 1fr 1fr 58px; gap: 5px; }
+      .calendar-grid { grid-template-columns: repeat(7, 34px); gap: 2px; }
+      .calendar-day, .calendar-empty { width: 34px; height: 30px; }
     }
   </style>
 </head>
@@ -312,47 +423,60 @@
   </div>
 </div>
 
-  <div class="panel">
-    <h1>Chaty – dostupnost</h1>
-    <input id="search" type="search" placeholder="Hledat chatu…" />
-
-    <div class="date-row">
-      <div>
-        <label for="dateFrom">Příjezd</label>
-        <input id="dateFrom" type="date" />
-      </div>
-      <div>
-        <label for="dateTo">Odjezd</label>
-        <input id="dateTo" type="date" />
-      </div>
-      <div>
-        <label for="minPlaces">Min. míst</label>
-        <input id="minPlaces" type="number" min="1" step="1" value="1" />
-      </div>
-    </div>
-
-    <div class="button-row" id="quickWindows">
-      <button data-weekend="0" class="active">Tento víkend</button>
-      <button data-weekend="1">Příští víkend</button>
-      <button data-weekend="2">Přespříští</button>
-      <button data-window="all">Vše</button>
-    </div>
-
-    <div class="button-row" id="filters">
-      <button data-status="all" class="active">Vše</button>
-      <button data-status="available">Má volno</button>
-      <button data-status="full">Nemá volno</button>
-      <button data-status="unknown">Neznámé</button>
-      <button data-status="no-data">Bez dat</button>
+  <div class="panel collapsed" id="panel">
+    <div class="panel-header">
+      <h1>Chaty – dostupnost</h1>
+      <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="panelBody">Filtry ▾</button>
     </div>
 
     <div class="status-line" id="summary">Načítám…</div>
     <div class="warning" id="warning" style="display:none"></div>
+
+    <div class="panel-body" id="panelBody">
+      <input id="search" type="search" placeholder="Hledat chatu…" />
+
+      <div class="date-row">
+        <div>
+          <label for="dateFrom">Příjezd</label>
+          <input id="dateFrom" type="date" />
+        </div>
+        <div>
+          <label for="dateTo">Odjezd</label>
+          <input id="dateTo" type="date" />
+        </div>
+        <div>
+          <label for="minPlaces">Min. míst</label>
+          <input id="minPlaces" type="number" min="1" step="1" value="1" />
+        </div>
+      </div>
+
+      <div class="button-row" id="quickWindows">
+        <button data-weekend="0" class="active">Tento víkend</button>
+        <button data-weekend="1">Příští víkend</button>
+        <button data-weekend="2">Přespříští</button>
+        <button data-window="all">Vše</button>
+      </div>
+
+      <div class="button-row" id="filters">
+        <button data-status="all" class="active">Vše</button>
+        <button data-status="available">Má volno</button>
+        <button data-status="full">Nemá volno</button>
+        <button data-status="unknown">Neznámé</button>
+        <button data-status="no-data">Bez dat</button>
+      </div>
+    </div>
   </div>
 
   <a class="mapy-logo" id="mapyLogo" href="https://mapy.com/" target="_blank" rel="noopener">
     <img src="https://api.mapy.com/img/api/logo.svg" alt="Mapy.com">
   </a>
+
+  <div class="sheet-backdrop" id="sheetBackdrop"></div>
+  <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Detail chaty">
+    <div class="bottom-sheet-handle"></div>
+    <button class="bottom-sheet-close" id="sheetClose" type="button" aria-label="Zavřít">✕</button>
+    <div class="bottom-sheet-content" id="sheetContent"></div>
+  </div>
 
   <script src="config.js"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -405,6 +529,45 @@ introClose.addEventListener("click", () => {
     let visibleLayer = L.layerGroup().addTo(map);
     let activeStatus = "all";
     let searchTerm = "";
+
+    // --- Mobile: filter panel collapse ---
+    const isMobile = () => window.matchMedia("(max-width: 700px)").matches;
+
+    const panelEl = document.getElementById("panel");
+    const panelToggleBtn = document.getElementById("panelToggle");
+
+    panelToggleBtn.addEventListener("click", () => {
+      const collapsedNow = panelEl.classList.toggle("collapsed");
+      panelToggleBtn.setAttribute("aria-expanded", String(!collapsedNow));
+      panelToggleBtn.textContent = collapsedNow ? "Filtry ▾" : "Skrýt ▴";
+    });
+
+    // --- Mobile: hut-detail bottom sheet (instead of a Leaflet popup) ---
+    const sheetBackdrop = document.getElementById("sheetBackdrop");
+    const bottomSheet = document.getElementById("bottomSheet");
+    const sheetContent = document.getElementById("sheetContent");
+    const sheetClose = document.getElementById("sheetClose");
+
+    function openBottomSheet(html) {
+      sheetContent.innerHTML = html;
+      bottomSheet.classList.add("open");
+      sheetBackdrop.classList.add("open");
+      // Give the map more room and avoid two overlapping UI layers at once.
+      panelEl.classList.add("collapsed");
+      panelToggleBtn.setAttribute("aria-expanded", "false");
+      panelToggleBtn.textContent = "Filtry ▾";
+    }
+
+    function closeBottomSheet() {
+      bottomSheet.classList.remove("open");
+      sheetBackdrop.classList.remove("open");
+    }
+
+    sheetClose.addEventListener("click", closeBottomSheet);
+    sheetBackdrop.addEventListener("click", closeBottomSheet);
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape") closeBottomSheet();
+    });
 
     function showWarning(text) {
       const warning = document.getElementById("warning");
@@ -740,17 +903,20 @@ introClose.addEventListener("click", () => {
         const lon = coords[0];
         const lat = coords[1];
 
-        const marker = L.circleMarker([lat, lon], markerStyle(item.summary))
-            .bindPopup(
-                popupHtml(item.feature, item.availMatch, item.summary, selected),
-            { maxWidth: 465 }
-            )
-        .addTo(visibleLayer);
+        const marker = L.circleMarker([lat, lon], markerStyle(item.summary)).addTo(visibleLayer);
+        const html = popupHtml(item.feature, item.availMatch, item.summary, selected);
 
-  marker.on("click", () => {
-    window.trackHutOpen(item.feature);
-  });
-});
+        if (!isMobile()) {
+          marker.bindPopup(html, { maxWidth: 465 });
+        }
+
+        marker.on("click", () => {
+          window.trackHutOpen(item.feature);
+          if (isMobile()) {
+            openBottomSheet(html);
+          }
+        });
+      });
 
       const availableCount = enriched.filter(item => item.summary.status === "available").length;
       const noDataCount = enriched.filter(item => item.summary.status === "no-data").length;
