@@ -203,7 +203,7 @@
     .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
     .legend-dot.alpenverein {
   background: #777777;
-  border: none;
+  border: 1px solid #111111;
   box-sizing: border-box;
 }
 
@@ -1146,16 +1146,15 @@ introClose.addEventListener("click", () => {
     }
 
     function alpenvereinMarkerStyle() {
-      return {
-        radius: 5,
-        fillColor: "#777777",
-        stroke: false,
-        color: "#ffffff",
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.75
-      };
-    }
+  return {
+    radius: 5,
+    fillColor: "#777777",
+    color: "#111111",
+    weight: 1,
+    opacity: 1,
+    fillOpacity: 0.78
+  };
+}
 
     function alpenvereinPopupHtml(feature) {
       const p = feature.properties || {};
