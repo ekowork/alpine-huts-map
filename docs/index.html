@@ -201,23 +201,24 @@
     .legend-dot.low { background: #f9a825; }
     .legend-dot.full { background: #c62828; }
     .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
-    .legend-dot.alpenverein { background: #6f42c1; border: 1px solid #4b2a86; box-sizing: border-box; }
+    .legend-dot.alpenverein {
+  background: #777777;
+  border: none;
+  box-sizing: border-box;
+}
 
     .panel label.extra-layer-row {
-      display: flex;
-      align-items: flex-start;
-      gap: 7px;
-      margin: 8px 0 4px 0;
-      padding: 8px;
-      border: 1px solid #e0d8f2;
-      background: #f7f2ff;
-      border-radius: 10px;
-      font-size: 12px;
-      font-weight: 400;
-      line-height: 1.35;
-      color: #333;
-      cursor: pointer;
-    }
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 4px 0;
+  padding: 8px;
+  border: 1px solid #dddddd;
+  background: #f7f7f7;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+}
 
     .panel .extra-layer-row input[type="checkbox"] {
       width: auto;
@@ -242,15 +243,14 @@
     }
 
     .alpenverein-note {
-      background: #f7f2ff;
-      border: 1px solid #d7c7f4;
-      border-radius: 8px;
-      padding: 7px 8px;
-      margin-top: 8px;
-      font-size: 12px;
-      line-height: 1.4;
-    }
-
+  background: #f7f7f7;
+  border: 1px solid #dddddd;
+  border-radius: 8px;
+  padding: 7px 8px;
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
 
   .intro-overlay {
   position: fixed;
@@ -529,10 +529,8 @@
     </p>
 
     <p>
-      Purple markers show huts from the <b>Alpenverein Hut Finder</b> that are not
-      connected to hut-reservation.org availability data in this map. They are shown
-      for discovery only. Please open the official hut page and check the booking
-      details there.
+      Grey markers show huts from the <b>Alpenverein Hut Finder</b> that are not
+      connected to hut-reservation.org availability data in this map.
     </p>
 
     <p>
@@ -604,7 +602,7 @@
             Show Alpenverein Hut Finder huts
           </span>
           <div class="extra-layer-note">
-            Purple huts are not connected to hut-reservation.org in this map.
+            Grey huts are not connected to hut-reservation.org in this map.
             Click them and check the official hut page for booking details.
           </div>
         </span>
@@ -1149,12 +1147,13 @@ introClose.addEventListener("click", () => {
 
     function alpenvereinMarkerStyle() {
       return {
-        radius: 7,
-        fillColor: "#6f42c1",
+        radius: 5,
+        fillColor: "#777777",
+        stroke: false,
         color: "#ffffff",
         weight: 2,
         opacity: 1,
-        fillOpacity: 0.92
+        fillOpacity: 0.75
       };
     }
 
