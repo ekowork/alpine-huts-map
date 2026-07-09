@@ -1,9 +1,32 @@
 <!doctype html>
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Alpine hut availability</title>
+  <title>Alpine Hut Availability Map | Find free beds in mountain huts</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Free interactive map of Alpine mountain huts with recently checked bed availability from hut-reservation.org. Quickly find huts with free places for your hiking trip." />
+  <meta name="robots" content="index, follow" />
+  <link rel="canonical" href="https://ekowork.github.io/alpine-huts-map/" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://ekowork.github.io/alpine-huts-map/" />
+  <meta property="og:title" content="Alpine Hut Availability Map" />
+  <meta property="og:description" content="Find Alpine mountain huts with recently checked free beds. A small free map for planning hut-to-hut trips." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Alpine Hut Availability Map" />
+  <meta name="twitter:description" content="Find Alpine mountain huts with recently checked free beds." />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Alpine Hut Availability Map",
+    "url": "https://ekowork.github.io/alpine-huts-map/",
+    "applicationCategory": "TravelApplication",
+    "operatingSystem": "Any",
+    "description": "Free interactive map of Alpine mountain huts with recently checked bed availability from hut-reservation.org."
+  }
+  </script>
 
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
@@ -190,9 +213,14 @@
   padding: 18px 18px 15px 18px;
 }
 
-.intro-box h2 {
+.intro-box h1 {
   margin: 0 0 10px 0;
   font-size: 19px;
+}
+
+.intro-box h2 {
+  margin: 12px 0 8px 0;
+  font-size: 15px;
 }
 
 .intro-box p {
@@ -419,16 +447,30 @@
 
   
 <body>
+  <noscript>
+    <main>
+      <h1>Alpine Hut Availability Map</h1>
+      <p>Free interactive map of Alpine mountain huts with recently checked bed availability from hut-reservation.org. Enable JavaScript to use the map and filters.</p>
+    </main>
+  </noscript>
+
   <div id="map"></div>
 
  <div class="intro-overlay" id="introOverlay" style="display:none">
   <div class="intro-box">
-    <h2>Mountain hut availability map</h2>
+    <h1>Alpine Hut Availability Map</h1>
 
     <p>
-      This is a map of mountain huts that can be booked via
-      <b>hut-reservation.org</b>. It shows indicative availability based on the
-      latest automatic data update.
+      Find mountain huts with recently checked free beds across the Alps.
+      The map helps you quickly spot huts that can be booked via
+      <b>hut-reservation.org</b>, instead of opening dozens of calendars by hand.
+    </p>
+
+    <h2>How to use it</h2>
+    <p>
+      Choose your arrival and departure dates, set the minimum number of places,
+      and click a hut to see the availability calendar. Green means more free beds,
+      yellow means only a few places left, red means full.
     </p>
 
     <p>
