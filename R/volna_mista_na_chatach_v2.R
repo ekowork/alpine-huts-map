@@ -1242,7 +1242,7 @@ for (hut in huts_to_check) {
     select(Hut, month_index, month_header, day, free_places, status) %>%
     group_by(month_index, month_header) %>%
     slice_head(n = 5) %>%
-    ungroup(),
+    ungroup()),
   n = Inf)
   
   counter <- counter + 1
