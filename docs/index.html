@@ -201,6 +201,55 @@
     .legend-dot.low { background: #f9a825; }
     .legend-dot.full { background: #c62828; }
     .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
+    .legend-dot.alpenverein { background: #6f42c1; border: 1px solid #4b2a86; box-sizing: border-box; }
+
+    .panel label.extra-layer-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      margin: 8px 0 4px 0;
+      padding: 8px;
+      border: 1px solid #e0d8f2;
+      background: #f7f2ff;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 400;
+      line-height: 1.35;
+      color: #333;
+      cursor: pointer;
+    }
+
+    .panel .extra-layer-row input[type="checkbox"] {
+      width: auto;
+      margin: 2px 0 0 0;
+      padding: 0;
+      border: 0;
+      flex-shrink: 0;
+      cursor: pointer;
+    }
+
+    .extra-layer-title {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 800;
+      color: #3d246b;
+    }
+
+    .extra-layer-note {
+      color: #555;
+      margin-top: 2px;
+    }
+
+    .alpenverein-note {
+      background: #f7f2ff;
+      border: 1px solid #d7c7f4;
+      border-radius: 8px;
+      padding: 7px 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      line-height: 1.4;
+    }
 
 
   .intro-overlay {
@@ -480,6 +529,13 @@
     </p>
 
     <p>
+      Purple markers show huts from the <b>Alpenverein Hut Finder</b> that are not
+      connected to hut-reservation.org availability data in this map. They are shown
+      for discovery only. Please open the official hut page and check the booking
+      details there.
+    </p>
+
+    <p>
       This is a small private project. The data may be incomplete, contain errors,
       or become outdated. The official reservation system of each hut is always
       the source of truth. The data should be updated early in the morning. There will be 
@@ -539,6 +595,20 @@
         <button data-status="unknown">Unknown</button>
         <button data-status="no-data">No data</button>
       </div>
+
+      <label class="extra-layer-row" for="showAlpenvereinOnly">
+        <input id="showAlpenvereinOnly" type="checkbox" checked />
+        <span>
+          <span class="extra-layer-title">
+            <span class="legend-dot alpenverein"></span>
+            Show Alpenverein Hut Finder huts
+          </span>
+          <div class="extra-layer-note">
+            Purple huts are not connected to hut-reservation.org in this map.
+            Click them and check the official hut page for booking details.
+          </div>
+        </span>
+      </label>
     </div>
   </div>
 
@@ -624,10 +694,15 @@ introClose.addEventListener("click", () => {
     ];
 
     let allFeatures = [];
+    let alpenvereinFeatures = [];
     let availabilityData = null;
+
     let visibleLayer = L.layerGroup().addTo(map);
+    let alpenvereinLayer = L.layerGroup().addTo(map);
+
     let activeStatus = "all";
     let searchTerm = "";
+    let showAlpenvereinOnly = true;
 
     // --- Mobile: filter panel collapse ---
     const isMobile = () => window.matchMedia("(max-width: 700px)").matches;
@@ -1037,6 +1112,144 @@ introClose.addEventListener("click", () => {
         </div>`;
     }
 
+
+    function normalizeHuetteNr(value) {
+      const digits = String(value ?? "").replace(/\D/g, "");
+      return digits ? digits.padStart(4, "0") : "";
+    }
+
+    function alpenvereinUrlFromProperties(properties) {
+      const p = properties || {};
+      const rawUrl = String(p.source_url || "").trim();
+      if (/^https:\/\/www\.alpenverein\.at\/huetten-en\/index\.php\?huette_nr=\d{4}$/.test(rawUrl)) {
+        return rawUrl;
+      }
+
+      const huetteNr = normalizeHuetteNr(p.huette_nr);
+      return huetteNr
+        ? `https://www.alpenverein.at/huetten-en/index.php?huette_nr=${huetteNr}`
+        : "";
+    }
+
+    function getFeatureLatLng(feature) {
+      const coords = feature?.geometry?.coordinates;
+      if (coords && coords.length >= 2) {
+        const lon = Number(coords[0]);
+        const lat = Number(coords[1]);
+        if (Number.isFinite(lat) && Number.isFinite(lon)) return [lat, lon];
+      }
+
+      const p = feature?.properties || {};
+      const lat = Number(p.lat);
+      const lon = Number(p.lon);
+      if (Number.isFinite(lat) && Number.isFinite(lon)) return [lat, lon];
+
+      return null;
+    }
+
+    function alpenvereinMarkerStyle() {
+      return {
+        radius: 7,
+        fillColor: "#6f42c1",
+        color: "#ffffff",
+        weight: 2,
+        opacity: 1,
+        fillOpacity: 0.92
+      };
+    }
+
+    function alpenvereinPopupHtml(feature) {
+      const p = feature.properties || {};
+
+      const name = escapeHtml(
+        p.hut_source_name ||
+        p.name ||
+        "Alpenverein hut"
+      );
+
+      const huetteNr = normalizeHuetteNr(p.huette_nr);
+      const safeUrl = alpenvereinUrlFromProperties(p);
+
+      return `
+        <div class="popup-wrap">
+          <div class="popup-title">${name}</div>
+          <div class="popup-subtitle">
+            Alpenverein Hut Finder${huetteNr ? ` · Hut no. ${escapeHtml(huetteNr)}` : ""}
+          </div>
+
+          <div class="alpenverein-note">
+            This hut is shown from the <b>Alpenverein Hut Finder</b>, but it is
+            <b>not connected to hut-reservation.org availability data</b> in this map.
+            No free-bed calendar is available here. Please open the official hut page
+            and check the current booking instructions there.
+          </div>
+
+          ${safeUrl ? `
+            <div class="popup-link">
+              <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">
+                Open official Alpenverein hut page
+              </a>
+            </div>
+          ` : `
+            <div class="popup-note">
+              Official hut link is missing or has an unexpected format.
+            </div>
+          `}
+        </div>
+      `;
+    }
+
+    function alpenvereinFeatureMatches(feature) {
+      const p = feature.properties || {};
+      const haystack = `
+        ${p.hut_source_name || ""}
+        ${p.name || ""}
+        ${p.huette_nr || ""}
+      `.toLowerCase();
+
+      return !searchTerm || haystack.includes(searchTerm);
+    }
+
+    function renderAlpenvereinOnly() {
+      alpenvereinLayer.clearLayers();
+
+      if (!showAlpenvereinOnly) return 0;
+
+      const matching = alpenvereinFeatures.filter(alpenvereinFeatureMatches);
+
+      matching.forEach(feature => {
+        const latlng = getFeatureLatLng(feature);
+        if (!latlng) return;
+
+        const marker = L.circleMarker(latlng, alpenvereinMarkerStyle())
+          .addTo(alpenvereinLayer);
+
+        const html = alpenvereinPopupHtml(feature);
+
+        if (!isMobile()) {
+          marker.bindPopup(html, { maxWidth: 430 });
+        }
+
+        marker.on("click", () => {
+          const p = feature.properties || {};
+          const name = p.hut_source_name || p.name || "alpenverein-hut";
+          const huetteNr = normalizeHuetteNr(p.huette_nr);
+          const slug = window.slugify(huetteNr ? `${name}-${huetteNr}` : name);
+
+          window.analyticsRouteTo(`/av/${slug}`, {
+            view: "alpenverein_hut",
+            hutId: slug
+          });
+
+          if (isMobile()) {
+            openBottomSheet(html);
+          }
+        });
+      });
+
+      return matching.length;
+    }
+
     function render() {
       if (!availabilityData) return;
       visibleLayer.clearLayers();
@@ -1051,13 +1264,10 @@ introClose.addEventListener("click", () => {
       const matching = enriched.filter(item => featureMatches(item.feature, item.summary));
 
       matching.forEach(item => {
-        const coords = item.feature.geometry && item.feature.geometry.coordinates;
-        if (!coords || coords.length < 2) return;
+        const latlng = getFeatureLatLng(item.feature);
+        if (!latlng) return;
 
-        const lon = coords[0];
-        const lat = coords[1];
-
-        const marker = L.circleMarker([lat, lon], markerStyle(item.summary)).addTo(visibleLayer);
+        const marker = L.circleMarker(latlng, markerStyle(item.summary)).addTo(visibleLayer);
         const html = popupHtml(item.feature, item.availMatch, item.summary, selected);
 
         if (!isMobile()) {
@@ -1072,10 +1282,14 @@ introClose.addEventListener("click", () => {
         });
       });
 
+      const alpenvereinVisibleCount = renderAlpenvereinOnly() || 0;
       const availableCount = enriched.filter(item => item.summary.status === "available").length;
       const noDataCount = enriched.filter(item => item.summary.status === "no-data").length;
       document.getElementById("summary").textContent =
-        `Showing ${matching.length} of ${allFeatures.length} huts. Available by filter: ${availableCount}. No connected data: ${noDataCount}.`;
+        `Showing ${matching.length} of ${allFeatures.length} reservation-system huts. ` +
+        `Available by filter: ${availableCount}. ` +
+        `No connected data: ${noDataCount}. ` +
+        `Alpenverein-only huts shown: ${alpenvereinVisibleCount}.`;
     }
 
     function setDefaultControls() {
@@ -1157,23 +1371,46 @@ introClose.addEventListener("click", () => {
       render();
     });
 
+    document.getElementById("showAlpenvereinOnly").addEventListener("change", event => {
+      showAlpenvereinOnly = event.target.checked;
+      render();
+    });
+
     ["dateFrom", "dateTo", "minPlaces"].forEach(id => {
       document.getElementById(id).addEventListener("input", render);
       document.getElementById(id).addEventListener("change", render);
     });
 
+    function fetchRequiredJson(url) {
+      return fetch(url + "?v=" + Date.now()).then(response => {
+        if (!response.ok) throw new Error(`${url} HTTP ${response.status}`);
+        return response.json();
+      });
+    }
+
+    function fetchOptionalGeojson(url) {
+      return fetch(url + "?v=" + Date.now())
+        .then(response => {
+          if (!response.ok) {
+            console.warn(`${url} HTTP ${response.status}; skipping optional layer.`);
+            return { features: [] };
+          }
+          return response.json();
+        })
+        .catch(error => {
+          console.warn(`Could not load ${url}; skipping optional layer.`, error);
+          return { features: [] };
+        });
+    }
+
     Promise.all([
-      fetch("huts.geojson?v=" + Date.now()).then(response => {
-        if (!response.ok) throw new Error(`huts.geojson HTTP ${response.status}`);
-        return response.json();
-      }),
-      fetch("availability.json?v=" + Date.now()).then(response => {
-        if (!response.ok) throw new Error(`availability.json HTTP ${response.status}`);
-        return response.json();
-      })
+      fetchRequiredJson("huts.geojson"),
+      fetchRequiredJson("availability.json"),
+      fetchOptionalGeojson("alpenverein_extra_huts.geojson")
     ])
-      .then(([geojson, availability]) => {
+      .then(([geojson, availability, alpenvereinGeojson]) => {
         allFeatures = geojson.features || [];
+        alpenvereinFeatures = alpenvereinGeojson.features || [];
         availabilityData = availability;
         setDefaultControls();
         
@@ -1182,8 +1419,12 @@ introClose.addEventListener("click", () => {
 
         const bounds = [];
         allFeatures.forEach(feature => {
-          const coords = feature.geometry && feature.geometry.coordinates;
-          if (coords && coords.length >= 2) bounds.push([coords[1], coords[0]]);
+          const latlng = getFeatureLatLng(feature);
+          if (latlng) bounds.push(latlng);
+        });
+        alpenvereinFeatures.forEach(feature => {
+          const latlng = getFeatureLatLng(feature);
+          if (latlng) bounds.push(latlng);
         });
         if (bounds.length > 0) map.fitBounds(bounds, { padding: [35, 35] });
       })
@@ -1195,4 +1436,3 @@ introClose.addEventListener("click", () => {
   </script>
 </body>
 </html>
-
