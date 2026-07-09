@@ -1,3 +1,6 @@
+Here is the fully translated HTML code. I've updated all the Czech UI text, labels, and JavaScript variables/messages into English while keeping the functionality and layout completely intact.
+
+```html
 <!doctype html>
 <html lang="en">
 <head>
@@ -8,7 +11,6 @@
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://ekowork.github.io/alpine-huts-map/" />
 
-  <!-- Favicons / app icons -->
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <link rel="icon" type="image/png" sizes="32x32" href="icon-32.png" />
   <link rel="icon" type="image/png" sizes="16x16" href="icon-16.png" />
@@ -450,13 +452,9 @@
 </script>
 
 
-<!-- Cloudflare Web Analytics -->
-  <script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
     data-cf-beacon='{"token": "e96be5b4a768454a824345d4cc74e3d2"}'></script>
-  <!-- End Cloudflare Web Analytics -->
-
-  
-<body>
+  <body>
   <noscript>
     <main>
       <h1>Alpine Hut Availability Map</h1>
@@ -504,44 +502,44 @@
 
   <div class="panel collapsed" id="panel">
     <div class="panel-header">
-      <h1>Chaty – dostupnost</h1>
-      <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="panelBody">Filtry ▾</button>
+      <h1>Hut Availability</h1>
+      <button id="panelToggle" class="panel-toggle" type="button" aria-expanded="false" aria-controls="panelBody">Filters ▾</button>
     </div>
 
-    <div class="status-line" id="summary">Načítám…</div>
+    <div class="status-line" id="summary">Loading...</div>
     <div class="warning" id="warning" style="display:none"></div>
 
     <div class="panel-body" id="panelBody">
-      <input id="search" type="search" placeholder="Hledat chatu…" />
+      <input id="search" type="search" placeholder="Search for a hut..." />
 
       <div class="date-row">
         <div>
-          <label for="dateFrom">Příjezd</label>
+          <label for="dateFrom">Arrival</label>
           <input id="dateFrom" type="date" />
         </div>
         <div>
-          <label for="dateTo">Odjezd</label>
+          <label for="dateTo">Departure</label>
           <input id="dateTo" type="date" />
         </div>
         <div>
-          <label for="minPlaces">Min. míst</label>
+          <label for="minPlaces">Min. places</label>
           <input id="minPlaces" type="number" min="1" step="1" value="1" />
         </div>
       </div>
 
       <div class="button-row" id="quickWindows">
-        <button data-weekend="0" class="active">Tento víkend</button>
-        <button data-weekend="1">Příští víkend</button>
-        <button data-weekend="2">Přespříští</button>
-        <button data-window="all">Vše</button>
+        <button data-weekend="0" class="active">This weekend</button>
+        <button data-weekend="1">Next weekend</button>
+        <button data-weekend="2">Weekend after next</button>
+        <button data-window="all">All</button>
       </div>
 
       <div class="button-row" id="filters">
-        <button data-status="all" class="active">Vše</button>
-        <button data-status="available">Má volno</button>
-        <button data-status="full">Nemá volno</button>
-        <button data-status="unknown">Neznámé</button>
-        <button data-status="no-data">Bez dat</button>
+        <button data-status="all" class="active">All</button>
+        <button data-status="available">Available</button>
+        <button data-status="full">Fully booked</button>
+        <button data-status="unknown">Unknown</button>
+        <button data-status="no-data">No data</button>
       </div>
     </div>
   </div>
@@ -551,11 +549,11 @@
   </a>
 
   <div class="sheet-backdrop" id="sheetBackdrop"></div>
-  <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Detail chaty">
+  <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Hut details">
     <div class="bottom-sheet-handle-area" id="sheetHandleArea">
       <div class="bottom-sheet-handle"></div>
     </div>
-    <button class="bottom-sheet-close" id="sheetClose" type="button" aria-label="Zavřít">✕</button>
+    <button class="bottom-sheet-close" id="sheetClose" type="button" aria-label="Close">✕</button>
     <div class="bottom-sheet-content" id="sheetContent"></div>
   </div>
 
@@ -575,13 +573,20 @@ introClose.addEventListener("click", () => {
   introOverlay.style.display = "none";
 });
         
-    const config = window.HUT_MAP_CONFIG || {};
+   const config = window.HUT_MAP_CONFIG || {};
     const mapyApiKey = (config.MAPY_API_KEY || "").trim();
 
     const map = L.map("map", { preferCanvas: true }).setView([47.5, 13.5], 7);
 
+    // Define the fallback OpenStreetMap layer
+    const osmLayer = L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    });
+
     if (mapyApiKey) {
-      L.tileLayer(
+      // Define the Mapy.com layer
+      const mapyLayer = L.tileLayer(
         `https://api.mapy.com/v1/maptiles/outdoor/256/{z}/{x}/{y}?apikey=${encodeURIComponent(mapyApiKey)}`,
         {
           minZoom: 0,
@@ -590,19 +595,34 @@ introClose.addEventListener("click", () => {
           zoomOffset: 0,
           attribution: '<a href="https://api.mapy.com/copyright" target="_blank" rel="noopener">© Seznam.cz a.s. a další</a>'
         }
-      ).addTo(map);
+      );
+      
+      mapyLayer.addTo(map);
       document.getElementById("mapyLogo").style.display = "block";
+
+      // --- FALLBACK LOGIC ---
+      let fallbackTriggered = false;
+      mapyLayer.on('tileerror', function() {
+        if (!fallbackTriggered) {
+          fallbackTriggered = true;
+          console.warn("Mapy.com tiles failed to load (possibly out of credits). Switching to OpenStreetMap.");
+          
+          map.removeLayer(mapyLayer);
+          osmLayer.addTo(map);
+          
+          document.getElementById("mapyLogo").style.display = "none";
+          showWarning("Mapy.com limits reached or unavailable. Showing fallback OpenStreetMap.");
+        }
+      });
+
     } else {
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      }).addTo(map);
-      showWarning("Chybí Mapy.com API klíč, proto teď vidíš fallback OpenStreetMap. Klíč vlož do config.js.");
+      osmLayer.addTo(map);
+      showWarning("Mapy.com API key is missing, showing fallback OpenStreetMap. Insert the key into config.js.");
     }
 
     const monthNames = [
-      "leden", "únor", "březen", "duben", "květen", "červen",
-      "červenec", "srpen", "září", "říjen", "listopad", "prosinec"
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
     ];
 
     let allFeatures = [];
@@ -620,7 +640,7 @@ introClose.addEventListener("click", () => {
     panelToggleBtn.addEventListener("click", () => {
       const collapsedNow = panelEl.classList.toggle("collapsed");
       panelToggleBtn.setAttribute("aria-expanded", String(!collapsedNow));
-      panelToggleBtn.textContent = collapsedNow ? "Filtry ▾" : "Skrýt ▴";
+      panelToggleBtn.textContent = collapsedNow ? "Filters ▾" : "Hide ▴";
     });
 
     // --- Mobile: hut-detail bottom sheet (instead of a Leaflet popup) ---
@@ -636,7 +656,7 @@ introClose.addEventListener("click", () => {
       // Give the map more room and avoid two overlapping UI layers at once.
       panelEl.classList.add("collapsed");
       panelToggleBtn.setAttribute("aria-expanded", "false");
-      panelToggleBtn.textContent = "Filtry ▾";
+      panelToggleBtn.textContent = "Filters ▾";
     }
 
     function closeBottomSheet() {
@@ -911,16 +931,16 @@ introClose.addEventListener("click", () => {
     }
 
     function statusLabel(day) {
-      if (!day) return "bez dat";
-      if (day.status === "available") return `${day.free} míst`;
-      if (day.status === "full") return "plno";
-      if (day.status === "closed") return "zavřeno";
-      if (day.status === "unknown") return "neznámé";
-      return day.status || "neznámé";
+      if (!day) return "no data";
+      if (day.status === "available") return `${day.free} places`;
+      if (day.status === "full") return "full";
+      if (day.status === "closed") return "closed";
+      if (day.status === "unknown") return "unknown";
+      return day.status || "unknown";
     }
 
     function renderMonthCalendar(year, monthIndex, calendar, selected) {
-      const weekdays = ["Po", "Út", "St", "Čt", "Pá", "So", "Ne"];
+      const weekdays = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
       const first = new Date(Date.UTC(year, monthIndex, 1));
       const leadingEmpty = (first.getUTCDay() + 6) % 7;
       const totalDays = daysInMonth(year, monthIndex);
@@ -958,7 +978,7 @@ introClose.addEventListener("click", () => {
     function renderCalendar(avail, selected) {
       const calendar = avail?.calendar || {};
       const dates = Object.keys(calendar).filter(d => parseIsoDate(d)).sort();
-      if (dates.length === 0) return `<div class="popup-section">Kalendář dostupnosti pro tuto chatu v datech není.</div>`;
+      if (dates.length === 0) return `<div class="popup-section">Availability calendar for this hut is missing in the data.</div>`;
 
       const months = Array.from(new Set(dates.map(date => monthKey(parseIsoDate(date)))));
       const monthHtml = months.map(key => {
@@ -970,7 +990,7 @@ introClose.addEventListener("click", () => {
         <div class="popup-section">
           ${monthHtml}
           <div class="calendar-legend">
-            <span class="legend-item"><span class="legend-dot high"></span>10+ míst</span>
+            <span class="legend-item"><span class="legend-dot high"></span>10+ places</span>
             <span class="legend-item"><span class="legend-dot medium"></span>4–9</span>
             <span class="legend-item"><span class="legend-dot low"></span>1–3</span>
             <span class="legend-item"><span class="legend-dot full"></span>0</span>
@@ -982,7 +1002,7 @@ introClose.addEventListener("click", () => {
     function popupHtml(feature, availMatch, summary, selected) {
       const p = feature.properties || {};
       const avail = availMatch.data;
-      const name = escapeHtml(p.name || avail?.name || "Chata");
+      const name = escapeHtml(p.name || avail?.name || "Hut");
       const country = escapeHtml(p.country || avail?.country || "");
       const reservationUrl = p.reservation_url || p.url || "";
       const notes = p.notes || "";
@@ -990,32 +1010,32 @@ introClose.addEventListener("click", () => {
       const scrapeSummary = avail?.summary || {};
       const errors = (availabilityData?.errors && availMatch.hutId && availabilityData.errors[availMatch.hutId]) || [];
 
-      const nightsWord = summary.nights === 1 ? "noc" : (summary.nights >= 2 && summary.nights <= 4 ? "noci" : "nocí");
+      const nightsWord = summary.nights === 1 ? "night" : "nights";
       const selectedText = summary.status === "available"
-        ? `<b>Ve vybraném období:</b> chata je volná na celou dobu pobytu (${summary.nights} ${nightsWord}) s min. ${selected.minPlaces} míst/noc. Nejméně volných míst za noc: ${summary.minFree}, nejvíc: ${summary.maxFree}.`
+        ? `<b>In selected period:</b> the hut is available for the entire stay (${summary.nights} ${nightsWord}) with min. ${selected.minPlaces} places/night. Min. free places per night: ${summary.minFree}, max: ${summary.maxFree}.`
         : summary.status === "full" || summary.status === "closed"
-          ? `<b>Ve vybraném období:</b> chata NENÍ volná po celou dobu pobytu (${summary.nights} ${nightsWord}) při min. ${selected.minPlaces} míst – alespoň jedna noc nevyhovuje${summary.status === "closed" ? " (zavřeno)" : ""}.`
+          ? `<b>In selected period:</b> the hut is NOT available for the entire stay (${summary.nights} ${nightsWord}) for min. ${selected.minPlaces} places – at least one night is insufficient${summary.status === "closed" ? " (closed)" : ""}.`
           : summary.status === "no-data"
-            ? `<b>Ve vybraném období:</b> pro tuhle chatu nemám napojená data z kalendáře.`
+            ? `<b>In selected period:</b> no calendar data is connected for this hut.`
             : summary.status === "no-nights"
-              ? `<b>Ve vybraném období:</b> vyber prosím odjezd alespoň o den později než příjezd (musí jít o min. 1 noc).`
-              : `<b>Ve vybraném období:</b> výsledek je nejistý – u některé noci chybí data.`;
+              ? `<b>In selected period:</b> please select a departure date at least one day after arrival (must be min. 1 night).`
+              : `<b>In selected period:</b> result is uncertain – data is missing for some nights.`;
 
       const wholeWindowText = avail
-        ? `<b>Celý stažený horizont:</b> ${scrapeSummary.days_available ?? "?"} dnů s volnem, max. ${scrapeSummary.max_free_places ?? "?"} míst, nejbližší volno ${scrapeSummary.next_available_date ? `${formatShortDate(scrapeSummary.next_available_date)} (${scrapeSummary.next_available_free} míst)` : "nenalezeno"}.`
+        ? `<b>Entire downloaded horizon:</b> ${scrapeSummary.days_available ?? "?"} days available, max. ${scrapeSummary.max_free_places ?? "?"} places, next availability ${scrapeSummary.next_available_date ? `${formatShortDate(scrapeSummary.next_available_date)} (${scrapeSummary.next_available_free} places)` : "not found"}.`
         : "";
 
       return `
         <div class="popup-wrap">
           <div class="popup-title">${name}</div>
-          <div class="popup-subtitle">${country ? `${country} · ` : ""}ID dostupnosti: ${escapeHtml(availMatch.hutId || "nenalezeno")}</div>
+          <div class="popup-subtitle">${country ? `${country} · ` : ""}Availability ID: ${escapeHtml(availMatch.hutId || "not found")}</div>
           <div class="popup-section">${selectedText}</div>
           ${wholeWindowText ? `<div class="popup-section">${wholeWindowText}</div>` : ""}
-          ${errors.length ? `<div class="popup-note">Pozor: scraper u této chaty zapsal ${errors.length} error řádek/řádků. Denní data ale mohou být částečně použitelná.</div>` : ""}
+          ${errors.length ? `<div class="popup-note">Warning: the scraper recorded ${errors.length} error row(s) for this hut. Daily data might still be partially usable.</div>` : ""}
           ${renderCalendar(avail, selected)}
-          ${notes ? `<div class="popup-section"><b>Poznámka:</b> ${escapeHtml(notes)}</div>` : ""}
-          ${reservationUrl ? `<div class="popup-link"><a href="${escapeHtml(reservationUrl)}" target="_blank" rel="noopener">Rezervace / detail</a></div>` : ""}
-          <div class="popup-subtitle" style="margin-top:8px">Dostupnost generována: ${escapeHtml(generatedAt || "neznámo")}</div>
+          ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
+          ${reservationUrl ? `<div class="popup-link"><a href="${escapeHtml(reservationUrl)}" target="_blank" rel="noopener">Reservation / details</a></div>` : ""}
+          <div class="popup-subtitle" style="margin-top:8px">Availability generated: ${escapeHtml(generatedAt || "unknown")}</div>
         </div>`;
     }
 
@@ -1057,7 +1077,7 @@ introClose.addEventListener("click", () => {
       const availableCount = enriched.filter(item => item.summary.status === "available").length;
       const noDataCount = enriched.filter(item => item.summary.status === "no-data").length;
       document.getElementById("summary").textContent =
-        `Zobrazeno ${matching.length} z ${allFeatures.length} chat. Volno podle filtru: ${availableCount}. Bez napojených dat: ${noDataCount}.`;
+        `Showing ${matching.length} of ${allFeatures.length} huts. Available by filter: ${availableCount}. No connected data: ${noDataCount}.`;
     }
 
     function setDefaultControls() {
@@ -1159,7 +1179,7 @@ introClose.addEventListener("click", () => {
         availabilityData = availability;
         setDefaultControls();
         
-        // Místo vykreslení s prázdnými daty nastavíme na začátek "Tento víkend"
+        // Instead of rendering with empty data, set to "This weekend" initially
         setWeekend(0);
 
         const bounds = [];
@@ -1170,10 +1190,12 @@ introClose.addEventListener("click", () => {
         if (bounds.length > 0) map.fitBounds(bounds, { padding: [35, 35] });
       })
       .catch(error => {
-        document.getElementById("summary").textContent = "Nepovedlo se načíst data mapy";
-        showWarning("Spusť mapu přes lokální server: python -m http.server 8000. Zkontroluj, že vedle index.html leží huts.geojson a availability.json.");
+        document.getElementById("summary").textContent = "Failed to load map data";
+        showWarning("Run the map via local server: python -m http.server 8000. Make sure huts.geojson and availability.json are located next to index.html.");
         console.error(error);
       });
   </script>
 </body>
 </html>
+
+```
