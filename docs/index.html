@@ -1128,9 +1128,7 @@
       return `
         <div class="popup-wrap">
           <div class="popup-title">${name}</div>
-          <div class="popup-subtitle">${country ? `${country} · ` : ""}Availability ID: ${escapeHtml(availMatch.hutId || "not found")}</div>
-          <div class="popup-section">${selectedText}</div>
-          ${wholeWindowText ? `<div class="popup-section">${wholeWindowText}</div>` : ""}
+          
           ${errors.length ? `<div class="popup-note">Warning: the scraper recorded ${errors.length} error row(s) for this hut. Daily data might still be partially usable.</div>` : ""}
           ${renderCalendar(avail, selected)}
           ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
