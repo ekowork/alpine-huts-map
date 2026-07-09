@@ -8,7 +8,10 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
-    html, body, #map { height: 100%; margin: 0; }
+    html, body, #map { height: 100%; margin: 0; overscroll-behavior: none; }
+    @supports (height: 100dvh) {
+      html, body, #map { height: 100dvh; }
+    }
     body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
 
     .panel {
@@ -243,6 +246,13 @@
 
     .panel .status-line { margin-top: 6px; }
 
+    .panel-body {
+      overflow: hidden;
+      transition: max-height 0.25s ease, opacity 0.2s ease;
+      max-height: 1000px;
+      opacity: 1;
+    }
+
     /* Mobile hut-detail sheet: a real fixed element outside the Leaflet map,
        so it can never collide with the filter panel and never drifts when
        the map is panned/zoomed (unlike faking position:fixed on a Leaflet
@@ -285,7 +295,16 @@
       background: #ddd;
       margin: 10px auto 2px auto;
       flex-shrink: 0;
+      touch-action: none;
+      cursor: grab;
     }
+
+    .bottom-sheet-handle-area {
+      padding: 6px 0 4px 0;
+      touch-action: none;
+    }
+
+    .bottom-sheet.dragging { transition: none; }
 
     .bottom-sheet-close {
       position: absolute;
@@ -304,6 +323,7 @@
 
     .bottom-sheet-content {
       overflow-y: auto;
+      overscroll-behavior: contain;
       padding: 4px 16px 18px 16px;
       -webkit-overflow-scrolling: touch;
     }
@@ -314,10 +334,17 @@
         right: 12px;
         max-height: calc(100vh - 24px);
         overflow-y: auto;
+        overscroll-behavior: contain;
       }
 
       .panel-toggle { display: inline-flex; }
-      .panel.collapsed .panel-body { display: none; }
+
+      .panel.collapsed .panel-body {
+        max-height: 0;
+        opacity: 0;
+        pointer-events: none;
+      }
+
       .panel button { padding: 6px 10px; font-size: 13px; }
 
       .popup-wrap { min-width: 300px; }
@@ -473,7 +500,9 @@
 
   <div class="sheet-backdrop" id="sheetBackdrop"></div>
   <div class="bottom-sheet" id="bottomSheet" role="dialog" aria-modal="true" aria-label="Detail chaty">
-    <div class="bottom-sheet-handle"></div>
+    <div class="bottom-sheet-handle-area" id="sheetHandleArea">
+      <div class="bottom-sheet-handle"></div>
+    </div>
     <button class="bottom-sheet-close" id="sheetClose" type="button" aria-label="Zavřít">✕</button>
     <div class="bottom-sheet-content" id="sheetContent"></div>
   </div>
@@ -567,6 +596,61 @@ introClose.addEventListener("click", () => {
     sheetBackdrop.addEventListener("click", closeBottomSheet);
     document.addEventListener("keydown", event => {
       if (event.key === "Escape") closeBottomSheet();
+    });
+
+    // Swipe-down-to-close on the drag handle, so the sheet feels like a
+    // native bottom sheet instead of just a box you can only close by tapping X.
+    const sheetHandleArea = document.getElementById("sheetHandleArea");
+    let dragStartY = null;
+    let dragCurrentY = 0;
+
+    function onDragStart(event) {
+      dragStartY = event.clientY;
+      dragCurrentY = 0;
+      bottomSheet.classList.add("dragging");
+      sheetHandleArea.setPointerCapture(event.pointerId);
+    }
+
+    function onDragMove(event) {
+      if (dragStartY === null) return;
+      dragCurrentY = Math.max(0, event.clientY - dragStartY);
+      bottomSheet.style.transform = `translateY(${dragCurrentY}px)`;
+    }
+
+    function onDragEnd() {
+      if (dragStartY === null) return;
+      bottomSheet.classList.remove("dragging");
+      bottomSheet.style.transform = "";
+      const sheetHeight = bottomSheet.getBoundingClientRect().height || 1;
+      if (dragCurrentY > sheetHeight * 0.28) {
+        closeBottomSheet();
+      }
+      dragStartY = null;
+      dragCurrentY = 0;
+    }
+
+    sheetHandleArea.addEventListener("pointerdown", onDragStart);
+    sheetHandleArea.addEventListener("pointermove", onDragMove);
+    sheetHandleArea.addEventListener("pointerup", onDragEnd);
+    sheetHandleArea.addEventListener("pointercancel", onDragEnd);
+
+    // Keep things consistent across breakpoint changes (e.g. rotating the
+    // phone, or resizing a desktop window down to phone width): close any
+    // open sheet and re-render so markers get the right click behaviour
+    // (Leaflet popup vs. bottom sheet) for the new mode.
+    let lastMode = isMobile();
+    let resizeTimer = null;
+    window.addEventListener("resize", () => {
+      if (map) map.invalidateSize();
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const nowMobile = isMobile();
+        if (nowMobile !== lastMode) {
+          lastMode = nowMobile;
+          closeBottomSheet();
+          render();
+        }
+      }, 150);
     });
 
     function showWarning(text) {
