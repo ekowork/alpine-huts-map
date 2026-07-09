@@ -451,54 +451,50 @@ select_hut_robust <- function(b, hut, timeout = 30) {
 
 
 open_calendar <- function(b, timeout = 20) {
+  # POZOR: nehledáme podle textu (datum/date/von/bis) - ten je u jednotlivých
+  # chat podle jejich nastaveného jazyka (např. FR), ale podle CSS tříd,
+  # které generuje Angular Material knihovna a jsou stejné ve všech jazycích.
   wait_for_js(
     b,
     "
-    Array.from(document.querySelectorAll('input')).some(el => {
-      const visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-      const meta = (
-        (el.placeholder || '') + ' ' +
-        (el.getAttribute('aria-label') || '') + ' ' +
-        (el.outerHTML || '')
-      ).toLowerCase();
-
-      return visible && !el.disabled &&
-             (meta.includes('datum') || meta.includes('date') || meta.includes('von') || meta.includes('bis'));
-    })
+    Array.from(document.querySelectorAll(
+      '.mat-datepicker-toggle, mat-datepicker-toggle, input[matdatepicker], input.mat-date-range-input-inner'
+    )).some(el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length))
     ",
     timeout = timeout
   )
   
   out <- b$Runtime$evaluate("
     JSON.stringify((function() {
-      const inputs = Array.from(document.querySelectorAll('input')).filter(el => {
-        const visible = !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
-        const meta = (
-          (el.placeholder || '') + ' ' +
-          (el.getAttribute('aria-label') || '') + ' ' +
-          (el.outerHTML || '')
-        ).toLowerCase();
+      const visible = el => !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
 
-        return visible && !el.disabled &&
-               (meta.includes('datum') || meta.includes('date') || meta.includes('von') || meta.includes('bis'));
-      });
+      // 1. Primárně: ikonka kalendáře (mat-datepicker-toggle) - jazykově neutrální.
+      const toggle = Array.from(document.querySelectorAll(
+        '.mat-datepicker-toggle, mat-datepicker-toggle'
+      )).find(visible);
 
-      const input = inputs[0];
+      if (toggle) {
+        const btn = toggle.querySelector('button') || toggle;
+        const r = btn.getBoundingClientRect();
+        return { found: true, x: r.left + r.width / 2, y: r.top + r.height / 2, via: 'toggle' };
+      }
+
+      // 2. Fallback: datumový input přes Angular Material atributy/třídy (ne text).
+      const input = Array.from(document.querySelectorAll(
+        'input[matdatepicker], input.mat-date-range-input-inner, input.mat-datepicker-input'
+      )).find(el => visible(el) && !el.disabled);
+
       if (!input) return { found: false };
 
       const field = input.closest('mat-form-field') || input.parentElement;
       const iconButton = field
-        ? field.querySelector('button, .mat-datepicker-toggle button, [mat-icon-button]')
+        ? field.querySelector('button, [mat-icon-button]')
         : null;
 
       const target = iconButton || input;
       const r = target.getBoundingClientRect();
 
-      return {
-        found: true,
-        x: r.left + r.width / 2,
-        y: r.top + r.height / 2
-      };
+      return { found: true, x: r.left + r.width / 2, y: r.top + r.height / 2, via: 'input-fallback' };
     })())
   ")
   
@@ -1167,18 +1163,20 @@ for (hut in huts_to_check) {
       
       click_enabled_button_physical(b, "OK", timeout = 10)
       
+      # POZOR: nekontrolujeme německá slova v textu (formulář chaty může být
+      # v jazyce, který má chata nastavený - např. FR), ale strukturální
+      # prvky Angular Material knihovny, které jsou stejné bez ohledu na jazyk.
       wait_for_js(
         b,
         "
       (function() {
-        const txt = (document.body.innerText || '').toLowerCase();
-
-        return txt.includes('verfügbarkeit prüfen') ||
-               txt.includes('datum von') ||
-               txt.includes('anzahl personen') ||
-               txt.includes('matratzenlager') ||
-               txt.includes('mehrbettzimmer') ||
-               txt.includes('zweierzimmer');
+        return !!(
+          document.querySelector('.mat-datepicker-toggle') ||
+          document.querySelector('mat-datepicker-toggle') ||
+          document.querySelector('input[matdatepicker]') ||
+          document.querySelector('input.mat-date-range-input-inner') ||
+          document.querySelectorAll('.mat-form-field').length > 0
+        );
       })()
       ",
         timeout = 12
