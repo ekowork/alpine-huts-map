@@ -1,4 +1,3 @@
-
 <!doctype html>
 <html lang="en">
 <head>
@@ -41,277 +40,314 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
   <style>
+    /* Base Resets & Typography */
     html, body, #map { height: 100%; margin: 0; overscroll-behavior: none; }
     @supports (height: 100dvh) {
       html, body, #map { height: 100dvh; }
     }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1f2937;
+      background: #f3f4f6;
+    }
 
+    /* Main Floating Panel (Glassmorphism) */
     .panel {
       position: absolute;
-      top: 12px;
-      left: 12px;
+      top: 16px;
+      left: 16px;
       z-index: 1000;
       width: 380px;
-      max-width: calc(100vw - 42px);
-      background: rgba(255, 255, 255, 0.96);
-      padding: 12px;
-      border-radius: 12px;
-      box-shadow: 0 2px 14px rgba(0,0,0,0.20);
+      max-width: calc(100vw - 32px);
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
     }
 
     .panel h1 {
-      font-size: 16px;
-      margin: 0 0 9px 0;
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      margin: 0 0 12px 0;
+      color: #111827;
     }
 
     .panel label {
       display: block;
-      font-size: 11px;
-      font-weight: 700;
-      color: #444;
-      margin-bottom: 3px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4b5563;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
     }
 
+    /* Modern Inputs */
     .panel input {
       box-sizing: border-box;
-      padding: 6px 8px;
-      border-radius: 8px;
-      border: 1px solid #bbb;
-      font-size: 13px;
-      background: white;
+      padding: 8px 12px;
+      border-radius: 10px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+      background: #f9fafb;
+      color: #111827;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+    .panel input:focus {
+      background: #ffffff;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
     }
 
-    .panel input[type="search"] { width: 100%; margin-bottom: 8px; }
-    .date-row { display: grid; grid-template-columns: 1fr 1fr 75px; gap: 7px; margin-bottom: 8px; }
+    .panel input[type="search"] { width: 100%; margin-bottom: 12px; }
+    .date-row { display: grid; grid-template-columns: 1fr 1fr 75px; gap: 8px; margin-bottom: 12px; }
     .date-row input { width: 100%; }
 
+    /* Modern Buttons */
     .button-row {
       display: flex;
-      gap: 6px;
+      gap: 8px;
       flex-wrap: wrap;
-      margin-bottom: 8px;
+      margin-bottom: 12px;
     }
 
     .panel button {
-      border: 1px solid #bbb;
-      background: #fff;
-      padding: 4px 8px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      color: #4b5563;
+      padding: 6px 12px;
       border-radius: 999px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+    }
+
+    .panel button:hover {
+      background: #f3f4f6;
+      color: #111827;
     }
 
     .panel button.active {
-      border-color: #111;
-      font-weight: 700;
-      background: #f3f3f3;
+      border-color: #111827;
+      background: #111827;
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(17, 24, 39, 0.2);
     }
 
-    .status-line { font-size: 12px; color: #333; line-height: 1.35; }
-    .warning { margin-top: 8px; font-size: 12px; color: #7a4b00; line-height: 1.35; }
+    .status-line { font-size: 13px; color: #4b5563; line-height: 1.4; }
+    .warning { margin-top: 8px; font-size: 13px; color: #b45309; background: #fef3c7; padding: 8px; border-radius: 8px; border: 1px solid #fde68a; line-height: 1.4; }
 
     .mapy-logo {
       position: absolute;
-      left: 12px;
-      bottom: 28px;
+      left: 16px;
+      bottom: 24px;
       z-index: 1000;
-      background: rgba(255,255,255,0.92);
-      padding: 4px 6px;
-      border-radius: 6px;
-      box-shadow: 0 1px 8px rgba(0,0,0,0.14);
+      background: rgba(255,255,255,0.95);
+      padding: 6px 8px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
       display: none;
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(0,0,0,0.05);
     }
-    .mapy-logo img { height: 30px; display: block; }
+    .mapy-logo img { height: 28px; display: block; }
 
-    .popup-wrap { min-width: 360px; max-width: 430px; }
-    .popup-title { font-weight: 800; margin-bottom: 4px; font-size: 16px; }
-    .popup-subtitle { font-size: 12px; color: #555; margin-bottom: 8px; }
-    .popup-section { margin-top: 8px; font-size: 12px; line-height: 1.35; }
-    .popup-section b { font-weight: 750; }
-    .popup-note { background: #fff6dd; border: 1px solid #f0d58a; border-radius: 8px; padding: 6px 7px; margin-top: 8px; font-size: 12px; }
-    .popup-link { margin-top: 8px; }
+    /* Popups */
+    .leaflet-popup-content-wrapper {
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+      padding: 4px;
+    }
+    .popup-wrap { min-width: 360px; max-width: 430px; font-family: inherit; }
+    .popup-title { font-weight: 800; margin-bottom: 4px; font-size: 17px; color: #111827; letter-spacing: -0.01em; }
+    .popup-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
+    .popup-section { margin-top: 10px; font-size: 13px; line-height: 1.45; color: #374151; }
+    .popup-section b { font-weight: 700; color: #111827; }
+    .popup-note { background: #fef3c7; border: 1px solid #fde68a; color: #92400e; border-radius: 10px; padding: 8px 10px; margin-top: 12px; font-size: 13px; }
+    .popup-link { margin-top: 12px; font-weight: 600; }
+    .popup-link a { color: #3b82f6; text-decoration: none; }
+    .popup-link a:hover { text-decoration: underline; color: #2563eb; }
 
+    /* Calendar Grid */
     .calendar-title {
-      font-weight: 800;
-      font-size: 13px;
-      margin: 12px 0 5px 0;
+      font-weight: 700;
+      font-size: 14px;
+      margin: 16px 0 8px 0;
+      color: #111827;
       text-transform: capitalize;
     }
 
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(7, 44px);
-      gap: 4px;
+      gap: 6px;
       align-items: center;
     }
 
     .calendar-weekday {
-      font-size: 10px;
-      color: #666;
+      font-size: 11px;
+      color: #6b7280;
       text-align: center;
       font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
     }
 
-    .calendar-empty {
-      width: 44px;
-      height: 34px;
-    }
+    .calendar-empty { width: 44px; height: 36px; }
 
     .calendar-day {
       width: 44px;
-      height: 34px;
-      border-radius: 8px;
-      border: 1px solid #d0d0d0;
+      height: 38px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
       box-sizing: border-box;
-      background: #f7f7f7;
-      color: #333;
+      background: #f9fafb;
+      color: #374151;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      line-height: 1.05;
+      line-height: 1.1;
+      transition: transform 0.1s;
     }
 
-    .calendar-day .dom { font-size: 10px; opacity: 0.86; }
-    .calendar-day .free { font-size: 13px; font-weight: 850; }
+    .calendar-day .dom { font-size: 11px; font-weight: 500; opacity: 0.9; }
+    .calendar-day .free { font-size: 14px; font-weight: 800; margin-top: 1px; }
 
-    .calendar-day.high { background: #1b7837; border-color: #1b7837; color: white; }
-    .calendar-day.medium { background: #86c97a; border-color: #86c97a; color: #10220e; }
-    .calendar-day.low { background: #f9a825; border-color: #f9a825; color: #111; }
-    .calendar-day.full { background: #c62828; border-color: #c62828; color: white; }
-    .calendar-day.closed { background: #424242; border-color: #424242; color: white; }
-    .calendar-day.unknown { background: #e0e0e0; border-color: #bdbdbd; color: #555; }
-    .calendar-day.outside-data { opacity: 0.38; }
-    .calendar-day.selected-range { outline: 2px solid #111; outline-offset: 1px; }
+    /* Modern Calendar Colors */
+    .calendar-day.high { background: #10b981; border-color: #059669; color: white; }
+    .calendar-day.medium { background: #34d399; border-color: #10b981; color: #064e3b; }
+    .calendar-day.low { background: #fbbf24; border-color: #d97706; color: #78350f; }
+    .calendar-day.full { background: #ef4444; border-color: #b91c1c; color: white; }
+    .calendar-day.closed { background: #374151; border-color: #1f2937; color: white; }
+    .calendar-day.unknown { background: #f3f4f6; border-color: #d1d5db; color: #6b7280; }
+    .calendar-day.outside-data { opacity: 0.4; }
+    .calendar-day.selected-range { outline: 2px solid #111827; outline-offset: 2px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
 
     .calendar-legend {
       display: flex;
-      gap: 8px;
+      gap: 12px;
       flex-wrap: wrap;
-      font-size: 10px;
-      margin-top: 8px;
-      color: #333;
+      font-size: 12px;
+      font-weight: 500;
+      margin-top: 12px;
+      color: #4b5563;
     }
 
-    .legend-item { display: inline-flex; align-items: center; gap: 3px; }
+    .legend-item { display: inline-flex; align-items: center; gap: 5px; }
     .legend-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
-    .legend-dot.high { background: #1b7837; }
-    .legend-dot.medium { background: #86c97a; }
-    .legend-dot.low { background: #f9a825; }
-    .legend-dot.full { background: #c62828; }
-    .legend-dot.unknown { background: #d8d8d8; border: 1px solid #aaa; box-sizing: border-box; }
-    .legend-dot.alpenverein {
-  background: #777777;
-  border: 1px solid #111111;
-  box-sizing: border-box;
-}
+    .legend-dot.high { background: #10b981; }
+    .legend-dot.medium { background: #34d399; }
+    .legend-dot.low { background: #fbbf24; }
+    .legend-dot.full { background: #ef4444; }
+    .legend-dot.unknown { background: #d1d5db; }
+    .legend-dot.alpenverein { background: #64748b; }
 
+    /* Extra Layers */
     .panel label.extra-layer-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 8px 0 4px 0;
-  padding: 8px;
-  border: 1px solid #dddddd;
-  background: #f7f7f7;
-  border-radius: 10px;
-  font-size: 12px;
-  line-height: 1.35;
-}
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 12px 0 4px 0;
+      padding: 10px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .panel label.extra-layer-row:hover { background: #f9fafb; }
 
     .panel .extra-layer-row input[type="checkbox"] {
-      width: auto;
+      width: 16px;
+      height: 16px;
       margin: 2px 0 0 0;
-      padding: 0;
-      border: 0;
-      flex-shrink: 0;
+      accent-color: #111827;
       cursor: pointer;
     }
 
     .extra-layer-title {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      font-weight: 800;
-      color: #3d246b;
+      gap: 6px;
+      font-weight: 700;
+      color: #1f2937;
     }
 
-    .extra-layer-note {
-      color: #555;
-      margin-top: 2px;
-    }
+    .extra-layer-note { color: #6b7280; margin-top: 4px; }
 
     .alpenverein-note {
-  background: #f7f7f7;
-  border: 1px solid #dddddd;
-  border-radius: 8px;
-  padding: 7px 8px;
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.4;
-}
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 10px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: #475569;
+    }
 
-  .intro-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  background: rgba(0, 0, 0, 0.38);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px;
-}
+    /* Intro Overlay Glassmorphism */
+    .intro-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 3000;
+      background: rgba(17, 24, 39, 0.4);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
 
-.intro-box {
-  width: 440px;
-  max-width: calc(100vw - 36px);
-  background: white;
-  border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.28);
-  padding: 18px 18px 15px 18px;
-}
+    .intro-box {
+      width: 440px;
+      max-width: calc(100vw - 40px);
+      background: white;
+      border-radius: 24px;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+      padding: 24px;
+    }
 
-.intro-box h1 {
-  margin: 0 0 10px 0;
-  font-size: 19px;
-}
+    .intro-box h1 { margin: 0 0 12px 0; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+    .intro-box h2 { margin: 16px 0 8px 0; font-size: 16px; font-weight: 700; color: #111827; }
+    .intro-box p { margin: 0 0 12px 0; font-size: 15px; line-height: 1.5; color: #4b5563; }
+    .intro-box .intro-small { font-size: 13px; color: #9ca3af; margin-top: 20px; }
+    .intro-box a { color: #3b82f6; text-decoration: none; font-weight: 500; }
+    .intro-box a:hover { text-decoration: underline; }
 
-.intro-box h2 {
-  margin: 12px 0 8px 0;
-  font-size: 15px;
-}
+    .intro-box button {
+      margin-top: 16px;
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 12px;
+      background: #111827;
+      color: white;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .intro-box button:hover { background: #374151; }
 
-.intro-box p {
-  margin: 0 0 10px 0;
-  font-size: 14px;
-  line-height: 1.45;
-  color: #333;
-}
-
-.intro-box .intro-small {
-  font-size: 12px;
-  color: #666;
-}
-
-.intro-box button {
-  margin-top: 8px;
-  width: 100%;
-  border: 0;
-  border-radius: 999px;
-  padding: 10px 12px;
-  background: #111;
-  color: white;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-    
+    /* Layout Utils */
     .panel-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
+      gap: 10px;
     }
 
     .panel-header h1 { margin: 0; }
@@ -319,39 +355,38 @@
     .panel-toggle {
       display: none;
       align-items: center;
-      gap: 4px;
-      border: 1px solid #bbb;
-      background: #fff;
+      gap: 6px;
+      border: 1px solid #e5e7eb;
+      background: #ffffff;
       padding: 6px 12px;
       border-radius: 999px;
-      font-size: 12px;
-      font-weight: 700;
+      font-size: 13px;
+      font-weight: 600;
       cursor: pointer;
       white-space: nowrap;
       flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
     }
 
-    .panel .status-line { margin-top: 6px; }
+    .panel .status-line { margin-top: 8px; margin-bottom: 4px; }
 
     .panel-body {
       overflow: hidden;
-      transition: max-height 0.25s ease, opacity 0.2s ease;
-      max-height: 1000px;
+      transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+      max-height: 1200px;
       opacity: 1;
     }
 
-    /* Mobile hut-detail sheet: a real fixed element outside the Leaflet map,
-       so it can never collide with the filter panel and never drifts when
-       the map is panned/zoomed (unlike faking position:fixed on a Leaflet
-       popup, which lives inside a transformed ancestor). */
+    /* Mobile Bottom Sheet */
     .sheet-backdrop {
       position: fixed;
       inset: 0;
       z-index: 2500;
-      background: rgba(0, 0, 0, 0.4);
+      background: rgba(17, 24, 39, 0.4);
+      backdrop-filter: blur(2px);
       opacity: 0;
       pointer-events: none;
-      transition: opacity 0.2s ease;
+      transition: opacity 0.3s ease;
     }
 
     .sheet-backdrop.open { opacity: 1; pointer-events: auto; }
@@ -363,11 +398,11 @@
       bottom: 0;
       z-index: 2600;
       background: white;
-      border-radius: 16px 16px 0 0;
-      box-shadow: 0 -4px 24px rgba(0,0,0,0.25);
-      max-height: 78vh;
+      border-radius: 24px 24px 0 0;
+      box-shadow: 0 -10px 40px rgba(0,0,0,0.15);
+      max-height: 85vh;
       transform: translateY(100%);
-      transition: transform 0.25s ease;
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       display: none;
       flex-direction: column;
       padding-bottom: env(safe-area-inset-bottom, 0);
@@ -376,18 +411,18 @@
     .bottom-sheet.open { transform: translateY(0); display: flex; }
 
     .bottom-sheet-handle {
-      width: 40px;
-      height: 4px;
+      width: 48px;
+      height: 5px;
       border-radius: 999px;
-      background: #ddd;
-      margin: 10px auto 2px auto;
+      background: #cbd5e1;
+      margin: 12px auto 4px auto;
       flex-shrink: 0;
       touch-action: none;
       cursor: grab;
     }
 
     .bottom-sheet-handle-area {
-      padding: 6px 0 4px 0;
+      padding: 6px 0 8px 0;
       touch-action: none;
     }
 
@@ -395,31 +430,34 @@
 
     .bottom-sheet-close {
       position: absolute;
-      top: 10px;
-      right: 12px;
+      top: 14px;
+      right: 16px;
       border: none;
-      background: #f0f0f0;
-      width: 28px;
-      height: 28px;
+      background: #f1f5f9;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
-      font-size: 14px;
+      font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      color: #444;
+      color: #475569;
+      transition: background 0.2s;
     }
+    .bottom-sheet-close:hover { background: #e2e8f0; color: #1e293b; }
 
     .bottom-sheet-content {
       overflow-y: auto;
       overscroll-behavior: contain;
-      padding: 4px 16px 18px 16px;
+      padding: 4px 20px 24px 20px;
       -webkit-overflow-scrolling: touch;
     }
 
+    /* Media Queries */
     @media (max-width: 700px) {
       .panel {
         width: auto;
-        right: 12px;
-        max-height: calc(100vh - 24px);
+        right: 16px;
+        max-height: calc(100vh - 32px);
         overflow-y: auto;
         overscroll-behavior: contain;
       }
@@ -430,23 +468,20 @@
         max-height: 0;
         opacity: 0;
         pointer-events: none;
+        margin-top: 0;
       }
 
-      .panel button { padding: 6px 10px; font-size: 13px; }
-
       .popup-wrap { min-width: 300px; }
-      .calendar-grid { grid-template-columns: repeat(7, 38px); gap: 3px; }
-      .calendar-day, .calendar-empty { width: 38px; height: 32px; }
-
-      /* Inside the bottom sheet the popup content should use the full
-         available width instead of the desktop min/max-width. */
+      .calendar-grid { grid-template-columns: repeat(7, 40px); gap: 4px; }
+      .calendar-day, .calendar-empty { width: 40px; height: 34px; }
       .bottom-sheet .popup-wrap { min-width: 0; max-width: none; }
     }
 
     @media (max-width: 380px) {
-      .date-row { grid-template-columns: 1fr 1fr 58px; gap: 5px; }
-      .calendar-grid { grid-template-columns: repeat(7, 34px); gap: 2px; }
-      .calendar-day, .calendar-empty { width: 34px; height: 30px; }
+      .date-row { grid-template-columns: 1fr 1fr 65px; gap: 6px; }
+      .calendar-grid { grid-template-columns: repeat(7, 36px); gap: 3px; }
+      .calendar-day, .calendar-empty { width: 36px; height: 32px; font-size: 12px; }
+      .calendar-day .free { font-size: 13px; }
     }
   </style>
 </head>
@@ -574,7 +609,7 @@
           <input id="dateTo" type="date" />
         </div>
         <div>
-          <label for="minPlaces">Min. places</label>
+          <label for="minPlaces">Min. beds</label>
           <input id="minPlaces" type="number" min="1" step="1" value="1" />
         </div>
       </div>
@@ -628,18 +663,18 @@
 
   <script>
     const introOverlay = document.getElementById("introOverlay");
-const introClose = document.getElementById("introClose");
+    const introClose = document.getElementById("introClose");
 
-if (!localStorage.getItem("hutMapIntroSeen")) {
-  introOverlay.style.display = "flex";
-}
+    if (!localStorage.getItem("hutMapIntroSeen")) {
+      introOverlay.style.display = "flex";
+    }
 
-introClose.addEventListener("click", () => {
-  localStorage.setItem("hutMapIntroSeen", "1");
-  introOverlay.style.display = "none";
-});
+    introClose.addEventListener("click", () => {
+      localStorage.setItem("hutMapIntroSeen", "1");
+      introOverlay.style.display = "none";
+    });
         
-   const config = window.HUT_MAP_CONFIG || {};
+    const config = window.HUT_MAP_CONFIG || {};
     const mapyApiKey = (config.MAPY_API_KEY || "").trim();
 
     const map = L.map("map", { preferCanvas: true }).setView([47.5, 13.5], 7);
@@ -714,7 +749,7 @@ introClose.addEventListener("click", () => {
       panelToggleBtn.textContent = collapsedNow ? "Filters ▾" : "Hide ▴";
     });
 
-    // --- Mobile: hut-detail bottom sheet (instead of a Leaflet popup) ---
+    // --- Mobile: hut-detail bottom sheet ---
     const sheetBackdrop = document.getElementById("sheetBackdrop");
     const bottomSheet = document.getElementById("bottomSheet");
     const sheetContent = document.getElementById("sheetContent");
@@ -724,7 +759,6 @@ introClose.addEventListener("click", () => {
       sheetContent.innerHTML = html;
       bottomSheet.classList.add("open");
       sheetBackdrop.classList.add("open");
-      // Give the map more room and avoid two overlapping UI layers at once.
       panelEl.classList.add("collapsed");
       panelToggleBtn.setAttribute("aria-expanded", "false");
       panelToggleBtn.textContent = "Filters ▾";
@@ -741,8 +775,6 @@ introClose.addEventListener("click", () => {
       if (event.key === "Escape") closeBottomSheet();
     });
 
-    // Swipe-down-to-close on the drag handle, so the sheet feels like a
-    // native bottom sheet instead of just a box you can only close by tapping X.
     const sheetHandleArea = document.getElementById("sheetHandleArea");
     let dragStartY = null;
     let dragCurrentY = 0;
@@ -777,10 +809,6 @@ introClose.addEventListener("click", () => {
     sheetHandleArea.addEventListener("pointerup", onDragEnd);
     sheetHandleArea.addEventListener("pointercancel", onDragEnd);
 
-    // Keep things consistent across breakpoint changes (e.g. rotating the
-    // phone, or resizing a desktop window down to phone width): close any
-    // open sheet and re-render so markers get the right click behaviour
-    // (Leaflet popup vs. bottom sheet) for the new mode.
     let lastMode = isMobile();
     let resizeTimer = null;
     window.addEventListener("resize", () => {
@@ -964,24 +992,25 @@ introClose.addEventListener("click", () => {
       };
     }
 
+    // Modern Map Marker Styles
     function markerStyle(summary) {
       const styles = {
-        high: { fillColor: "#1b7837", radius: 9 },
-        medium: { fillColor: "#86c97a", radius: 9 },
-        low: { fillColor: "#f9a825", radius: 8 },
-        full: { fillColor: "#c62828", radius: 7 },
-        closed: { fillColor: "#424242", radius: 7 },
-        unknown: { fillColor: "#1976d2", radius: 7 },
-        "no-data": { fillColor: "#9e9e9e", radius: 6 }
+        high: { fillColor: "#10b981", radius: 9, color: "#047857" }, 
+        medium: { fillColor: "#34d399", radius: 9, color: "#059669" },
+        low: { fillColor: "#fbbf24", radius: 8, color: "#b45309" }, 
+        full: { fillColor: "#ef4444", radius: 7, color: "#991b1b" }, 
+        closed: { fillColor: "#374151", radius: 7, color: "#111827" }, 
+        unknown: { fillColor: "#9ca3af", radius: 7, color: "#4b5563" },
+        "no-data": { fillColor: "#e5e7eb", radius: 6, color: "#9ca3af" }
       };
       const s = styles[summary.level] || styles[summary.status] || styles.unknown;
       return {
         radius: s.radius,
         fillColor: s.fillColor,
-        color: "#111",
-        weight: 1,
+        color: s.color,
+        weight: 1.5,
         opacity: 1,
-        fillOpacity: 0.9
+        fillOpacity: 0.95
       };
     }
 
@@ -1106,10 +1135,9 @@ introClose.addEventListener("click", () => {
           ${renderCalendar(avail, selected)}
           ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
           ${reservationUrl ? `<div class="popup-link"><a href="${escapeHtml(reservationUrl)}" target="_blank" rel="noopener">Reservation / details</a></div>` : ""}
-          <div class="popup-subtitle" style="margin-top:8px">Availability generated: ${escapeHtml(generatedAt || "unknown")}</div>
+          <div class="popup-subtitle" style="margin-top:16px; font-size:11px;">Availability generated: ${escapeHtml(generatedAt || "unknown")}</div>
         </div>`;
     }
-
 
     function normalizeHuetteNr(value) {
       const digits = String(value ?? "").replace(/\D/g, "");
@@ -1146,15 +1174,15 @@ introClose.addEventListener("click", () => {
     }
 
     function alpenvereinMarkerStyle() {
-  return {
-    radius: 5,
-    fillColor: "#777777",
-    color: "#111111",
-    weight: 1,
-    opacity: 1,
-    fillOpacity: 0.78
-  };
-}
+      return {
+        radius: 6,
+        fillColor: "#64748b",
+        color: "#334155",
+        weight: 1.5,
+        opacity: 1,
+        fillOpacity: 0.9
+      };
+    }
 
     function alpenvereinPopupHtml(feature) {
       const p = feature.properties || {};
@@ -1412,7 +1440,6 @@ introClose.addEventListener("click", () => {
         availabilityData = availability;
         setDefaultControls();
         
-        // Instead of rendering with empty data, set to "This weekend" initially
         setWeekend(0);
 
         const bounds = [];
