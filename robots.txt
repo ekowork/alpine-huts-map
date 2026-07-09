@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://ekowork.github.io/alpine-huts-map/sitemap.xml
