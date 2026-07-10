@@ -60,13 +60,12 @@ jobs:
         with:
           chrome-version: stable
           install-dependencies: true
-
+      
       - name: Check Chrome
         run: |
-        echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
-        "${{ steps.setup-chrome.outputs.chrome-path }}" --version
-
-      
+          echo "Chrome path: ${{ steps.setup-chrome.outputs.chrome-path }}"
+          "${{ steps.setup-chrome.outputs.chrome-path }}" --version
+        
       - name: Run scraper
         run: |
           Rscript R/volna_mista_na_chatach_v2.R
