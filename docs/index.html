@@ -176,6 +176,36 @@
     .popup-link a { color: #3b82f6; text-decoration: none; }
     .popup-link a:hover { text-decoration: underline; color: #2563eb; }
 
+    /* NEW: Reservation Box Button */
+    .popup-reservation-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 24px auto 8px auto;
+      width: fit-content;
+      min-width: 220px;
+      padding: 14px 24px;
+      background: #16a34a;
+      color: #ffffff !important;
+      font-size: 16px;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border-radius: 999px;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .popup-reservation-box:hover {
+      background: #15803d;
+      box-shadow: 0 6px 20px rgba(22, 163, 74, 0.4);
+      transform: scale(1.03) translateY(-2px);
+      text-decoration: none;
+    }
+    .popup-reservation-box:active {
+      transform: scale(0.98) translateY(0);
+    }
+
     /* Calendar Grid */
     .calendar-title {
       font-weight: 700;
@@ -486,7 +516,6 @@
   </style>
 </head>
 
-
 <script>
   window.APP_BASE_PATH = "/alpine-huts-map"; 
   
@@ -532,7 +561,6 @@
     window.analyticsRouteTo("/", { view: "map" });
   };
 </script>
-
 
 <script defer src='https://static.cloudflareinsights.com/beacon.min.js' 
     data-cf-beacon='{"token": "e96be5b4a768454a824345d4cc74e3d2"}'></script>
@@ -1133,7 +1161,11 @@
           ${errors.length ? `<div class="popup-note">Warning: the scraper recorded ${errors.length} error row(s) for this hut. Daily data might still be partially usable.</div>` : ""}
           ${renderCalendar(avail, selected)}
           ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
-          ${reservationUrl ? `<div class="popup-link"><a href="${escapeHtml(reservationUrl)}" target="_blank" rel="noopener">Reservation / details</a></div>` : ""}
+          
+          ${reservationUrl 
+            ? `<a href="${escapeHtml(reservationUrl)}" class="popup-reservation-box" target="_blank" rel="noopener">RESERVE!</a>` 
+            : `<div class="popup-note" style="margin-top:12px; text-align:center;">Odkaz na rezervaci není v datech k dispozici.</div>`}
+
           <div class="popup-subtitle" style="margin-top:16px; font-size:11px;">Availability generated: ${escapeHtml(generatedAt || "unknown")}</div>
         </div>`;
     }
@@ -1210,13 +1242,11 @@
           </div>
 
           ${safeUrl ? `
-            <div class="popup-link">
-              <a href="${escapeHtml(safeUrl)}" target="_blank" rel="noopener noreferrer">
-                Open official Alpenverein hut page
-              </a>
-            </div>
+            <a href="${escapeHtml(safeUrl)}" class="popup-reservation-box" target="_blank" rel="noopener noreferrer">
+              GO TO ALPENVEREIN!
+            </a>
           ` : `
-            <div class="popup-note">
+            <div class="popup-note" style="margin-top:16px; text-align:center;">
               Official hut link is missing or has an unexpected format.
             </div>
           `}
