@@ -181,20 +181,26 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      margin: 24px auto 8px auto;
+      margin: 16px auto 8px auto;
       width: fit-content;
-      min-width: 220px;
-      padding: 14px 24px;
-      background: #16a34a;
+      padding: 8px 20px;
+      background: #10b981; /* Stejná zelená jako v kalendáři */
       color: #ffffff !important;
-      font-size: 16px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+      font-size: 14px;
+      font-weight: normal; /* Bez boldu */
       border-radius: 999px;
       text-decoration: none;
-      box-shadow: 0 4px 14px rgba(22, 163, 74, 0.3);
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+      transition: all 0.2s ease;
+    }
+    .popup-reservation-box:hover {
+      background: #059669; /* Tmavší zelená po najetí */
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+      transform: translateY(-1px);
+      text-decoration: none;
+    }
+    .popup-reservation-box:active {
+      transform: translateY(0);
     }
     .popup-reservation-box:hover {
       background: #15803d;
@@ -1163,8 +1169,8 @@
           ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
           
           ${reservationUrl 
-            ? `<a href="${escapeHtml(reservationUrl)}" class="popup-reservation-box" target="_blank" rel="noopener">RESERVE!</a>` 
-            : `<div class="popup-note" style="margin-top:12px; text-align:center;">Odkaz na rezervaci není v datech k dispozici.</div>`}
+            ? `<a href="${escapeHtml(reservationUrl)}" class="popup-reservation-box" target="_blank" rel="noopener">Reserve</a>` 
+            : `<div class="popup-note" style="margin-top:12px; text-align:center;">Odkaz na rezervaci není v datech k dispozici.</div>`
 
           <div class="popup-subtitle" style="margin-top:16px; font-size:11px;">Availability generated: ${escapeHtml(generatedAt || "unknown")}</div>
         </div>`;
@@ -1243,7 +1249,7 @@
 
           ${safeUrl ? `
             <a href="${escapeHtml(safeUrl)}" class="popup-reservation-box" target="_blank" rel="noopener noreferrer">
-              GO TO ALPENVEREIN!
+              Go to Alpenverein
             </a>
           ` : `
             <div class="popup-note" style="margin-top:16px; text-align:center;">
