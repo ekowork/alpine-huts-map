@@ -898,7 +898,62 @@ hut_email <- get_required_env("HUT_EMAIL")
 hut_password <- get_required_env("HUT_PASSWORD")
 
 
-b <- ChromoteSession$new()
+options(
+  chromote.timeout = 30,
+  chromote.headless = "new",
+  chromote.launch.echo_cmd = TRUE
+)
+
+chromote::set_chrome_args(c(
+  "--no-sandbox",
+  "--disable-dev-shm-usage",
+  "--window-size=1920,1080"
+))
+
+                 
+
+start_browser <- function(max_attempts = 3L) {
+  last_error <- NULL
+
+  for (attempt in seq_len(max_attempts)) {
+    message(
+      "Spouštím Chrome: pokus ",
+      attempt,
+      "/",
+      max_attempts
+    )
+
+    session <- tryCatch(
+      chromote::ChromoteSession$new(),
+      error = function(e) {
+        last_error <<- e
+        NULL
+      }
+    )
+
+    if (!is.null(session)) {
+      message("Chrome byl úspěšně spuštěn.")
+      return(session)
+    }
+
+    message(
+      "Spuštění Chrome selhalo: ",
+      conditionMessage(last_error)
+    )
+
+    Sys.sleep(5 * attempt)
+  }
+
+  stop(
+    "Chrome se nepodařilo spustit po ",
+    max_attempts,
+    " pokusech. Poslední chyba: ",
+    conditionMessage(last_error)
+  )
+}
+
+b <- start_browser()
+
 
 # Lokálně si klidně nech zobrazit browser, v GitHub Actions ne.
 if (Sys.getenv("GITHUB_ACTIONS") != "true") {
