@@ -1164,7 +1164,7 @@
         <div class="popup-wrap">
           <div class="popup-title">${name}</div>
           
-          ${errors.length ? `<div class="popup-note">Warning: the scraper recorded ${errors.length} error row(s) for this hut. Daily data might still be partially usable.</div>` : ""}
+          ${Array.isArray(errors) && errors.length > 0 && errors[0].message !== null ? `<div class="popup-note">Warning: the scraper recorded ${errors.length} error row(s) for this hut. Daily data might still be partially usable.</div>` : ""}
           ${renderCalendar(avail, selected)}
           ${notes ? `<div class="popup-section"><b>Note:</b> ${escapeHtml(notes)}</div>` : ""}
           
