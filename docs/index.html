@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <title>Alpine Hut Availability Map | Find free beds in mountain huts</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="description" content="Free interactive map of Alpine mountain huts with recently checked bed availability from hut-reservation.org. Quickly find huts with free places for your hiking trip." />
   <meta name="robots" content="index, follow" />
   <link rel="canonical" href="https://ekowork.github.io/alpine-huts-map/" />
@@ -45,6 +45,7 @@
     @supports (height: 100dvh) {
       html, body, #map { height: 100dvh; }
     }
+    html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
     body { 
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       color: #1f2937;
@@ -59,6 +60,10 @@
       z-index: 1000;
       width: 420px;
       max-width: calc(100vw - 32px);
+      max-height: calc(100vh - 32px);
+      max-height: calc(100dvh - 32px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
       background: rgba(255, 255, 255, 0.85);
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
@@ -66,6 +71,12 @@
       border-radius: 20px;
       border: 1px solid rgba(255, 255, 255, 0.4);
       box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    }
+
+    /* Some in-app browsers (older WebViews) don't support backdrop-filter;
+       fall back to a near-opaque panel so text stays legible without the blur. */
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .panel { background: rgba(255, 255, 255, 0.97); }
     }
 
     .panel h1 {
@@ -166,7 +177,7 @@
       box-shadow: 0 10px 30px rgba(0,0,0,0.12);
       padding: 4px;
     }
-    .popup-wrap { min-width: 360px; max-width: 430px; font-family: inherit; }
+    .popup-wrap { min-width: 360px; max-width: 430px; max-height: min(75vh, 560px); overflow-y: auto; font-family: inherit; }
     .popup-title { font-weight: 800; margin-bottom: 4px; font-size: 17px; color: #111827; letter-spacing: -0.01em; }
     .popup-subtitle { font-size: 13px; color: #6b7280; margin-bottom: 12px; }
     .popup-section { margin-top: 10px; font-size: 13px; line-height: 1.45; color: #374151; }
@@ -333,11 +344,15 @@
       align-items: center;
       justify-content: center;
       padding: 20px;
+      overflow-y: auto;
     }
 
     .intro-box {
       width: 440px;
       max-width: calc(100vw - 40px);
+      max-height: calc(100vh - 40px);
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
       background: white;
       border-radius: 24px;
       box-shadow: 0 20px 40px rgba(0,0,0,0.2);
@@ -476,14 +491,16 @@
       -webkit-overflow-scrolling: touch;
     }
 
-    /* Media Queries */
-    @media (max-width: 700px) {
+    /* Media Queries
+       "Small viewport" = narrow phones (max-width) OR short/landscape phones and
+       short browser windows (max-height). Checking BOTH dimensions, not just width,
+       is what makes the collapsible panel + bottom sheet kick in for landscape
+       phones and big-screen phones too (e.g. a phone in landscape is often wider
+       than 700px but only ~380-430px tall). */
+    @media (max-width: 700px), (max-height: 500px) {
       .panel {
         width: auto;
         right: 16px;
-        max-height: calc(100vh - 32px);
-        overflow-y: auto;
-        overscroll-behavior: contain;
       }
 
       .panel-toggle { display: inline-flex; }
@@ -495,94 +512,58 @@
         margin-top: 0;
       }
 
+      /* 16px stops iOS Safari auto-zooming the whole page when a text/date/number
+         input is focused (it does this whenever the focused input's font-size < 16px). */
+      .panel input { font-size: 16px; }
+
       .popup-wrap { min-width: 300px; }
-      .calendar-grid { grid-template-columns: repeat(7, 40px); gap: 4px; }
-      .calendar-day, .calendar-empty { width: 40px; height: 34px; }
-      .bottom-sheet .popup-wrap { min-width: 0; max-width: none; }
+      .bottom-sheet .popup-wrap { min-width: 0; max-width: none; max-height: none; overflow-y: visible; }
+
+      .calendar-grid {
+        grid-template-columns: repeat(7, 34px);
+        gap: 3px;
+        justify-content: center;
+      }
+
+      .calendar-day,
+      .calendar-empty {
+        width: 34px;
+        height: 30px;
+        border-radius: 7px;
+      }
+
+      .calendar-day .dom { font-size: 9px; }
+      .calendar-day .free { font-size: 12px; margin-top: 0; }
+      .calendar-weekday { font-size: 9px; }
+
+      .calendar-title { font-size: 13px; margin: 12px 0 6px; }
+      .bottom-sheet-content { padding: 2px 12px 16px; }
+      .popup-title { font-size: 16px; }
+      .popup-section { margin-top: 6px; }
+      .calendar-legend { gap: 7px; font-size: 10px; margin-top: 8px; }
     }
 
     @media (max-width: 380px) {
-  .date-row {
-    grid-template-columns: 1fr 1fr 58px;
-    gap: 5px;
-  }
+      .date-row {
+        grid-template-columns: 1fr 1fr 58px;
+        gap: 5px;
+      }
 
-  .calendar-grid {
-    grid-template-columns: repeat(7, 31px);
-    gap: 2px;
-  }
+      .calendar-grid {
+        grid-template-columns: repeat(7, 31px);
+        gap: 2px;
+      }
 
-  .calendar-day,
-  .calendar-empty {
-    width: 31px;
-    height: 28px;
-    border-radius: 6px;
-  }
+      .calendar-day,
+      .calendar-empty {
+        width: 31px;
+        height: 28px;
+        border-radius: 6px;
+      }
 
-  .calendar-day .dom {
-    font-size: 8px;
-  }
-
-  .calendar-day .free {
-    font-size: 11px;
-  }
-}
-
-    @media (max-width: 700px) {
-  /* Menší kalendářové boxíky */
-  .calendar-grid {
-    grid-template-columns: repeat(7, 34px);
-    gap: 3px;
-    justify-content: center;
-  }
-
-  .calendar-day,
-  .calendar-empty {
-    width: 34px;
-    height: 30px;
-    border-radius: 7px;
-  }
-
-  .calendar-day .dom {
-    font-size: 9px;
-  }
-
-  .calendar-day .free {
-    font-size: 12px;
-    margin-top: 0;
-  }
-
-  .calendar-weekday {
-    font-size: 9px;
-  }
-
-  /* Menší mezery mezi měsíci */
-  .calendar-title {
-    font-size: 13px;
-    margin: 12px 0 6px;
-  }
-
-  /* Užší obsah spodního panelu */
-  .bottom-sheet-content {
-    padding: 2px 12px 16px;
-  }
-
-  .popup-title {
-    font-size: 16px;
-  }
-
-  .popup-section {
-    margin-top: 6px;
-  }
-
-  .calendar-legend {
-    gap: 7px;
-    font-size: 10px;
-    margin-top: 8px;
-  }
-}
-
-    
+      .calendar-day .dom { font-size: 8px; }
+      .calendar-day .free { font-size: 11px; }
+    }
   </style>
 </head>
 
@@ -837,7 +818,7 @@
     let showAlpenvereinOnly = true;
 
     // --- Mobile: filter panel collapse ---
-    const isMobile = () => window.matchMedia("(max-width: 700px)").matches;
+    const isMobile = () => window.matchMedia("(max-width: 700px), (max-height: 500px)").matches;
 
     const panelEl = document.getElementById("panel");
     const panelToggleBtn = document.getElementById("panelToggle");
