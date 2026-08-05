@@ -1,0 +1,6 @@
+hut_id,hut_name,country,lat,lon,status,availability,available_dates,limited_dates,full_dates,closed_dates,last_checked,reservation_url,notes
+adamek-huette,Adamek-Hütte,AT,47.4965,13.6260,available,"Volno v několika dnech v červenci",2026-07-12|2026-07-13|2026-07-14|2026-07-21,2026-07-15|2026-07-16,2026-07-17|2026-07-18|2026-07-19,,2026-07-01 16:20,https://www.alpsonline.org/,Ukázkový řádek
+dachstein-suedwandhuette,Dachstein-Südwandhütte,AT,47.4679,13.6227,limited,"Jen pár volných nocí",2026-07-10|2026-07-24,2026-07-11|2026-07-12|2026-07-25,2026-07-13|2026-07-14|2026-07-15,,2026-07-01 16:20,https://www.alpsonline.org/,Ukázkový řádek
+preintalerhuette,Preintalerhütte,AT,47.3109,13.7973,full,"Plno ve zvoleném termínu",,2026-07-20,2026-07-12|2026-07-13|2026-07-14|2026-07-15,,2026-07-01 16:20,https://www.alpsonline.org/,Ukázkový řádek
+winterraum-example,Winterraum example,AT,47.2000,13.5000,closed,"Zavřeno / mimo sezónu",,,,2026-07-12|2026-07-13|2026-07-14|2026-07-15,2026-07-01 16:20,,Ukázkový řádek
+unknown-example,Unknown example,CH,46.8000,8.2000,unknown,"Neověřeno",,,,,2026-07-01 16:20,,Ukázkový řádek
